@@ -413,6 +413,7 @@ Current stage: {stage}
 Stage turn count: {stage_turn_count}
 Known signals so far: {signals}
 
+Previous assistant message: "{previous_assistant_message}"
 User message: "{user_message}"
 
 Extract any new information from this message and respond with a JSON object.
@@ -421,7 +422,9 @@ Extract any new information from this message and respond with a JSON object.
 
 _OBSERVE_SUFFIX = """
 
-Only update fields where the current message provides clear new information. For boolean fields already true, keep them true."""
+Only update fields where the current message provides clear new information. For boolean fields already true, keep them true.
+
+Output format: respond with ONLY a single JSON object. No markdown fences, no prose, no commentary, no explanation before or after. The first character of your reply must be `{{` and the last must be `}}`."""
 
 
 OBSERVE_PROMPTS: dict[Strategy, str] = {
@@ -465,15 +468,18 @@ OBSERVE_PROMPTS: dict[Strategy, str] = {
 }}"""
     + _OBSERVE_SUFFIX,
     Strategy.MISPERCEPTION_CORRECTION: _OBSERVE_PREFIX
-    + """Extract:
+    + """Quiz state (authoritative — do NOT recompute):
+- The current question the agent is asking about is: {current_question_id}
+- If {current_question_id} is null, all 8 questions have been completed and the quiz is in the wrap-up phase.
+
+Extract:
 {{
-    "intro_completed": <true if the agent has delivered the introduction framing and the user has agreed to proceed, else false>,
-    "questions_answered": <integer count of quiz questions for which the user has provided a Likert response AND the agent has revealed the survey finding — increment only after both halves are complete>,
-    "question_answers": <dict mapping question ID to the user's numeric choice — e.g. {{"q3": 2}} if the user just answered question 3 with option 2 (probably not). Infer the current question ID as "q{{questions_answered + 1}}". Map text answers: never→1, probably not→2, probably→3, definitely→4. Only include the key for the question just answered; omit keys for unanswered questions. Return {{}} if no new answer was given this turn.>,
-    "reflection_shared": <true if the user has shared their overall reaction after all 8 questions, else false>
+    "intro_completed": <true if the agent has delivered the intro framing and the user has agreed to proceed; else false. Once true, stays true.>,
+    "questions_answered": <integer count of quiz questions for which BOTH the user answered AND the agent revealed the finding. Increment by 1 ONLY if the previous assistant message contains a survey reveal (phrases like "surveys found", "national surveys", "survey data") AND the user's current message acknowledges/continues. Otherwise keep the existing value. Never decrease, never exceed 8.>,
+    "question_answers": <dict mapping question ID to the user's numeric choice. ONLY populate when the user's CURRENT message is a Likert answer (starts with or contains a digit 1-4 with a brief reason) AND {current_question_id} is not null — in that case set "{current_question_id}" to that digit. Map text answers: never→1, probably not→2, probably→3, definitely→4. Otherwise return {{}}. Never write to a q-key other than {current_question_id}.>,
+    "reflection_shared": <true ONLY if {current_question_id} is null AND the user has shared an overall reaction to the quiz; else false. Do not set true mid-quiz.>
 }}"""
-    + _OBSERVE_SUFFIX
-    + " For questions_answered, never decrease the value.",
+    + _OBSERVE_SUFFIX,
 }
 
 # ---------------------------------------------------------------------------

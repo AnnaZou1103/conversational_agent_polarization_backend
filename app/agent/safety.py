@@ -4,13 +4,13 @@ Pure regex + heuristics — no LLM calls. Runs synchronously in the agent pipeli
 before OBSERVE/THINK/EXECUTE so that bad input never contaminates the main
 research model's context or the extracted `signals`.
 """
+
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Literal
-
 
 # ---------------------------------------------------------------------------
 # Reminder / termination templates (pre-written, not LLM-generated)
@@ -132,67 +132,327 @@ def contains_indecent(msg: str) -> bool:
 
 # Allowlist: short-but-valid replies that would otherwise be flagged.
 _SHORT_VALID_REPLIES = {
-    "ok", "okay", "yes", "no", "yep", "nope", "yeah", "nah", "sure",
-    "idk", "lol", "hmm", "huh", "maybe", "skip", "continue", "next",
-    "true", "false", "right", "wrong", "fine", "good", "bad", "same",
-    "agree", "republican", "democrat", "democratic", "gop",
+    "ok",
+    "okay",
+    "yes",
+    "no",
+    "yep",
+    "nope",
+    "yeah",
+    "nah",
+    "sure",
+    "idk",
+    "lol",
+    "hmm",
+    "huh",
+    "maybe",
+    "skip",
+    "continue",
+    "next",
+    "true",
+    "false",
+    "right",
+    "wrong",
+    "fine",
+    "good",
+    "bad",
+    "same",
+    "agree",
+    "republican",
+    "democrat",
+    "democratic",
+    "gop",
     # Greetings — short but valid openers
-    "hi", "hello", "hey", "heya", "hiya", "howdy", "greetings",
-    "yo", "sup", "morning", "afternoon", "evening",
+    "hi",
+    "hello",
+    "hey",
+    "heya",
+    "hiya",
+    "howdy",
+    "greetings",
+    "yo",
+    "sup",
+    "morning",
+    "afternoon",
+    "evening",
 }
 
 # Tiny built-in English wordlist — enough to recognize at least one common
 # word in virtually any coherent English message. Intentionally small and
 # auditable; for richer coverage, swap in a file-loaded wordlist later.
-_COMMON_WORDS = frozenset({
-    # articles, pronouns, prepositions
-    "the", "a", "an", "i", "you", "he", "she", "it", "we", "they", "me", "him",
-    "her", "us", "them", "my", "your", "his", "its", "our", "their",
-    "this", "that", "these", "those", "what", "which", "who", "whom",
-    "of", "in", "on", "at", "by", "to", "for", "with", "from", "as", "into",
-    "about", "over", "under", "through", "between", "before", "after",
-    "during", "against", "without",
-    # be / have / do / modal
-    "am", "is", "are", "was", "were", "be", "been", "being",
-    "have", "has", "had", "having",
-    "do", "does", "did", "doing", "done",
-    "will", "would", "shall", "should", "can", "could", "may", "might", "must",
-    # common verbs
-    "go", "going", "went", "come", "came", "get", "got", "make", "made",
-    "think", "thought", "see", "saw", "know", "knew", "feel", "felt",
-    "say", "said", "tell", "told", "want", "need", "like", "love", "hate",
-    "believe", "understand", "mean", "try", "use", "work", "find", "give",
-    "take", "put", "keep", "let", "help", "talk", "speak", "ask", "answer",
-    "live", "seem", "become", "leave", "happen",
-    # political / study vocabulary
-    "politics", "political", "party", "republican", "democrat", "democratic",
-    "gop", "vote", "voted", "voter", "voters", "election", "elections",
-    "government", "country", "nation", "american", "americans",
-    "liberal", "conservative", "moderate", "independent",
-    "president", "senator", "congress", "media", "news", "social",
-    "people", "person", "side", "sides", "issue", "issues",
-    # emotion / opinion
-    "feel", "feeling", "feelings", "frustrated", "frustrating", "tired",
-    "exhausted", "angry", "sad", "happy", "scared", "worried", "hopeful",
-    "interesting", "surprised", "surprising",
-    # conjunctions / common connectors
-    "and", "or", "but", "not", "so", "because", "if", "then", "than",
-    "though", "although", "while", "also", "too", "either", "neither",
-    "just", "only", "really", "very", "much", "more", "most", "less",
-    "some", "any", "all", "every", "each", "both", "many", "few",
-    # time / place
-    "now", "then", "today", "yesterday", "tomorrow", "year", "years",
-    "day", "days", "time", "times", "here", "there", "where", "when", "why",
-    "how", "because",
-    # misc common
-    "thing", "things", "something", "someone", "anything", "anyone",
-    "everything", "everyone", "nothing", "nobody",
-    "back", "down", "up", "out", "off", "still", "even", "again",
-    "yes", "no", "maybe", "sure", "okay",
-    # greetings
-    "hi", "hello", "hey", "heya", "hiya", "howdy", "greetings",
-    "yo", "sup", "morning", "afternoon", "evening", "hola",
-})
+_COMMON_WORDS = frozenset(
+    {
+        # articles, pronouns, prepositions
+        "the",
+        "a",
+        "an",
+        "i",
+        "you",
+        "he",
+        "she",
+        "it",
+        "we",
+        "they",
+        "me",
+        "him",
+        "her",
+        "us",
+        "them",
+        "my",
+        "your",
+        "his",
+        "its",
+        "our",
+        "their",
+        "this",
+        "that",
+        "these",
+        "those",
+        "what",
+        "which",
+        "who",
+        "whom",
+        "of",
+        "in",
+        "on",
+        "at",
+        "by",
+        "to",
+        "for",
+        "with",
+        "from",
+        "as",
+        "into",
+        "about",
+        "over",
+        "under",
+        "through",
+        "between",
+        "before",
+        "after",
+        "during",
+        "against",
+        "without",
+        # be / have / do / modal
+        "am",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "having",
+        "do",
+        "does",
+        "did",
+        "doing",
+        "done",
+        "will",
+        "would",
+        "shall",
+        "should",
+        "can",
+        "could",
+        "may",
+        "might",
+        "must",
+        # common verbs
+        "go",
+        "going",
+        "went",
+        "come",
+        "came",
+        "get",
+        "got",
+        "make",
+        "made",
+        "think",
+        "thought",
+        "see",
+        "saw",
+        "know",
+        "knew",
+        "feel",
+        "felt",
+        "say",
+        "said",
+        "tell",
+        "told",
+        "want",
+        "need",
+        "like",
+        "love",
+        "hate",
+        "believe",
+        "understand",
+        "mean",
+        "try",
+        "use",
+        "work",
+        "find",
+        "give",
+        "take",
+        "put",
+        "keep",
+        "let",
+        "help",
+        "talk",
+        "speak",
+        "ask",
+        "answer",
+        "live",
+        "seem",
+        "become",
+        "leave",
+        "happen",
+        # political / study vocabulary
+        "politics",
+        "political",
+        "party",
+        "republican",
+        "democrat",
+        "democratic",
+        "gop",
+        "vote",
+        "voted",
+        "voter",
+        "voters",
+        "election",
+        "elections",
+        "government",
+        "country",
+        "nation",
+        "american",
+        "americans",
+        "liberal",
+        "conservative",
+        "moderate",
+        "independent",
+        "president",
+        "senator",
+        "congress",
+        "media",
+        "news",
+        "social",
+        "people",
+        "person",
+        "side",
+        "sides",
+        "issue",
+        "issues",
+        # emotion / opinion
+        "feel",
+        "feeling",
+        "feelings",
+        "frustrated",
+        "frustrating",
+        "tired",
+        "exhausted",
+        "angry",
+        "sad",
+        "happy",
+        "scared",
+        "worried",
+        "hopeful",
+        "interesting",
+        "surprised",
+        "surprising",
+        # conjunctions / common connectors
+        "and",
+        "or",
+        "but",
+        "not",
+        "so",
+        "because",
+        "if",
+        "then",
+        "than",
+        "though",
+        "although",
+        "while",
+        "also",
+        "too",
+        "either",
+        "neither",
+        "just",
+        "only",
+        "really",
+        "very",
+        "much",
+        "more",
+        "most",
+        "less",
+        "some",
+        "any",
+        "all",
+        "every",
+        "each",
+        "both",
+        "many",
+        "few",
+        # time / place
+        "now",
+        "then",
+        "today",
+        "yesterday",
+        "tomorrow",
+        "year",
+        "years",
+        "day",
+        "days",
+        "time",
+        "times",
+        "here",
+        "there",
+        "where",
+        "when",
+        "why",
+        "how",
+        "because",
+        # misc common
+        "thing",
+        "things",
+        "something",
+        "someone",
+        "anything",
+        "anyone",
+        "everything",
+        "everyone",
+        "nothing",
+        "nobody",
+        "back",
+        "down",
+        "up",
+        "out",
+        "off",
+        "still",
+        "even",
+        "again",
+        "yes",
+        "no",
+        "maybe",
+        "sure",
+        "okay",
+        # greetings
+        "hi",
+        "hello",
+        "hey",
+        "heya",
+        "hiya",
+        "howdy",
+        "greetings",
+        "yo",
+        "sup",
+        "morning",
+        "afternoon",
+        "evening",
+        "hola",
+    }
+)
 
 
 def _normalize(msg: str) -> str:
@@ -250,8 +510,15 @@ def _has_no_vowels(msg: str) -> bool:
     return not re.search(r"[aeiouyAEIOUY]", letters)
 
 
-def is_gibberish(msg: str) -> bool:
-    """Heuristic gibberish detection — no LLM, all regex/token rules."""
+def is_gibberish(msg: str, quiz_mode: bool = False) -> bool:
+    """Heuristic gibberish detection — no LLM, all regex/token rules.
+
+    quiz_mode=True skips the dictionary soft-signal: in misperception_correction
+    stage_2, valid Likert reasoning ("doesn't sound right", "feels wrong") often
+    contains zero words from our small _COMMON_WORDS list, so the soft-signal's
+    false-positive rate is too high. Hard signals (length, char-runs, repeats,
+    vowel-less) still fire.
+    """
     normalized = _normalize(msg)
 
     # Empty / whitespace-only is invalid
@@ -286,6 +553,9 @@ def is_gibberish(msg: str) -> bool:
     if contains_indecent(normalized):
         return False
 
+    if quiz_mode:
+        return False
+
     # Soft signal — require both short-ish length AND no recognized word
     if len(normalized) <= 40 and not _has_recognized_word(normalized):
         return True
@@ -317,8 +587,8 @@ class SafetyVerdict:
     termination_text: str = ""
     user_message_excerpt: str = ""
     consecutive_reminders: int = 0  # post-application streak value
-    indecent_count: int = 0          # lifetime, logging only
-    invalid_count: int = 0           # lifetime, logging only
+    indecent_count: int = 0  # lifetime, logging only
+    invalid_count: int = 0  # lifetime, logging only
     timestamp: str = field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
@@ -342,6 +612,7 @@ def evaluate_message(
     consecutive_reminders: int,
     indecent_count: int,
     invalid_count: int,
+    quiz_mode: bool = False,
 ) -> SafetyVerdict:
     """Classify the message and decide action given current session counters.
 
@@ -354,7 +625,7 @@ def evaluate_message(
     """
     excerpt = user_message[:200]
 
-    gibberish = is_gibberish(user_message) or is_exact_repeat(
+    gibberish = is_gibberish(user_message, quiz_mode=quiz_mode) or is_exact_repeat(
         user_message, previous_user_message
     )
     indecent = contains_indecent(user_message)

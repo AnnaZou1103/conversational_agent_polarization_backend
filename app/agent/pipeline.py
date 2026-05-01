@@ -22,44 +22,42 @@ from app.llm.base import LLMProvider, Message
 logger = logging.getLogger(__name__)
 
 
-def _merge_question_answers(existing: dict, incoming: dict) -> dict:
-    """Merge quiz answers while preserving previously captured question slots."""
-    merged = dict(existing)
+def _extract_json_object(text: str) -> str:
+    """Pull the first balanced JSON object out of a model response.
 
-    def _question_index(raw_key: str) -> int:
-        if not isinstance(raw_key, str) or not raw_key.startswith("q"):
-            return 10**9
-        try:
-            return int(raw_key[1:])
-        except ValueError:
-            return 10**9
-
-    for raw_key, raw_value in sorted(
-        incoming.items(), key=lambda item: _question_index(item[0])
-    ):
-        if not isinstance(raw_key, str) or not raw_key.startswith("q"):
-            continue
-
-        try:
-            idx = int(raw_key[1:])
-        except ValueError:
-            continue
-
-        if idx < 1:
-            continue
-
-        if not isinstance(raw_value, int) or raw_value < 1 or raw_value > 4:
-            continue
-
-        target_key = f"q{idx}"
-        while target_key in merged and merged[target_key] != raw_value:
-            idx += 1
-            target_key = f"q{idx}"
-
-        if target_key not in merged:
-            merged[target_key] = raw_value
-
-    return merged
+    Tolerates markdown fences and any leading/trailing prose. Raises
+    ValueError if no balanced object is found.
+    """
+    if not text:
+        raise ValueError("empty response")
+    fence = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    if fence:
+        return fence.group(1)
+    start = text.find("{")
+    if start == -1:
+        raise ValueError("no '{' in response")
+    depth = 0
+    in_str = False
+    escape = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if in_str:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_str = False
+        else:
+            if ch == '"':
+                in_str = True
+            elif ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    return text[start : i + 1]
+    raise ValueError("unbalanced JSON object")
 
 
 class AgentPipeline:
@@ -69,24 +67,44 @@ class AgentPipeline:
         self.llm = llm
         self.stage_controller = StageController(llm)
 
-    async def _observe(self, state: SessionState, user_message: str) -> None:
+    async def _observe(
+        self,
+        state: SessionState,
+        user_message: str,
+        previous_assistant_message: str = "",
+    ) -> None:
         """Analyze user message and update condition-specific signals."""
         prompt_template = OBSERVE_PROMPTS[Strategy(state.strategy)]
+
+        # Deterministically compute the question the agent is currently asking
+        # about, so OBSERVE doesn't have to infer it from prose. Only meaningful
+        # for the misperception_correction strategy; ignored elsewhere. We
+        # derive it from the number of q-keys already captured (self-healing
+        # against any drift in questions_answered), not from questions_answered.
+        answered_keys = state.signals.get("question_answers", {})
+        n_answered = len(answered_keys) if isinstance(answered_keys, dict) else 0
+        current_qid = f"q{n_answered + 1}" if n_answered < 8 else None
+
         prompt = prompt_template.format(
             condition=state.strategy,
             stage=state.stage.value,
             stage_turn_count=state.stage_turn_count,
             signals=json.dumps(state.signals),
+            previous_assistant_message=previous_assistant_message.replace('"', '\\"'),
             user_message=user_message,
+            current_question_id=current_qid,
         )
 
         try:
-            response = await self.llm.complete(
-                messages=[Message(role="user", content=prompt)],
-                temperature=0.1,
-                max_tokens=512,
+            response = await asyncio.wait_for(
+                self.llm.complete(
+                    messages=[Message(role="user", content=prompt)],
+                    temperature=0.1,
+                    max_tokens=512,
+                ),
+                timeout=30.0,
             )
-            extracted = json.loads(response.strip().strip("```json").strip("```"))
+            extracted = json.loads(_extract_json_object(response))
 
             # Merge extracted signals into state. Never overwrite existing data
             # with an empty/falsy value — the model occasionally drops a field
@@ -111,28 +129,33 @@ class AgentPipeline:
                         state.signals[key] = value
                 elif isinstance(value, dict):
                     existing = state.signals.get(key, {})
-                    if (
-                        key == "question_answers"
-                        and isinstance(existing, dict)
-                        and isinstance(value, dict)
-                    ):
-                        state.signals[key] = _merge_question_answers(existing, value)
-                    else:
-                        state.signals[key] = (
-                            {**existing, **value}
-                            if isinstance(existing, dict)
-                            else value
-                        )
+                    state.signals[key] = (
+                        {**existing, **value} if isinstance(existing, dict) else value
+                    )
                 elif isinstance(value, str):
                     if value:
                         state.signals[key] = value
                 else:
                     state.signals[key] = value
 
+            # For misperception_correction, derive questions_answered from the
+            # set of recorded answers so the stage-transition gate is robust
+            # to LLM drift on the counter itself.
+            if Strategy(state.strategy) == Strategy.MISPERCEPTION_CORRECTION:
+                answers = state.signals.get("question_answers", {})
+                if isinstance(answers, dict):
+                    state.signals["questions_answered"] = len(answers)
+
             state.metadata["last_observation"] = extracted
 
-        except (json.JSONDecodeError, KeyError) as e:
-            logger.warning("Observation extraction failed: %s", e)
+        except asyncio.TimeoutError:
+            logger.warning("Observation timed out after 30s; signals unchanged")
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            logger.warning(
+                "Observation extraction failed (%s): %s", type(e).__name__, e
+            )
 
     async def _think(self, state: SessionState, user_message: str) -> str:
         """Internal reasoning step — LLM plans its approach before responding."""
@@ -170,12 +193,21 @@ class AgentPipeline:
         Pure regex + heuristics — synchronous and microsecond-cheap. Does not
         mutate state; the caller is responsible for applying the verdict.
         """
+        # Disable the dictionary soft-signal during the misperception quiz —
+        # Likert reasoning ("doesn't sound right") frequently contains zero
+        # _COMMON_WORDS hits and would otherwise be false-flagged.
+        quiz_mode = (
+            Strategy(state.strategy) == Strategy.MISPERCEPTION_CORRECTION
+            and state.stage == Stage.STAGE_2
+        )
+
         return evaluate_message(
             user_message=user_message,
             previous_user_message=state.previous_user_message,
             consecutive_reminders=state.consecutive_reminders,
             indecent_count=state.indecent_count,
             invalid_count=state.invalid_count,
+            quiz_mode=quiz_mode,
         )
 
     # Sentinel yielded during blocking pipeline work to signal keep-alive
@@ -205,9 +237,14 @@ class AgentPipeline:
         state.stage_turn_count += 1
 
         user_message = ""
+        previous_assistant_message = ""
         for msg in reversed(messages):
-            if msg.get("role") == "user":
+            role = msg.get("role")
+            if role == "user" and not user_message:
                 user_message = msg["content"]
+            elif role == "assistant" and not previous_assistant_message:
+                previous_assistant_message = msg["content"]
+            if user_message and previous_assistant_message:
                 break
 
         # --- SAFETY MONITOR ---
@@ -257,7 +294,9 @@ class AgentPipeline:
 
         # --- OBSERVE + STAGE EVALUATION ---
         if state.turn_count >= 1:
-            observe_task = asyncio.create_task(self._observe(state, user_message))
+            observe_task = asyncio.create_task(
+                self._observe(state, user_message, previous_assistant_message)
+            )
             stage_task = asyncio.create_task(
                 self.stage_controller.evaluate_transition(state, user_message)
             )
