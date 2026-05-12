@@ -6,6 +6,7 @@ from app.db.admin import (
     get_users_by_state_and_strategy,
     delete_all_users,
     delete_user_by_id,
+    reset_user,
 )
 from app.db.user import study_id_is_valid
 from app.schema import (
@@ -65,3 +66,14 @@ def delete_user_route(study_id: str, request: AdminRequest):
         raise HTTPException(status_code=404, detail="Study ID Not Found")
     delete_user_by_id(study_id=study_id)
     return f"Delete Users {study_id} Successfully"
+
+
+@router.post("/reset/{study_id}")
+def reset_user_route(study_id: str, request: AdminRequest):
+    """Reset a user's state and clear their conversation history."""
+    if request.password != admin_password:
+        raise HTTPException(status_code=403, detail="Invalid admin password")
+    if not study_id_is_valid(study_id=study_id):
+        raise HTTPException(status_code=404, detail="Study ID Not Found")
+    reset_user(study_id=study_id)
+    return f"Reset user {study_id} successfully"

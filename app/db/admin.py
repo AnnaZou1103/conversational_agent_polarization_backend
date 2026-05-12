@@ -74,3 +74,14 @@ def delete_all_users() -> int:
 def delete_user_by_id(study_id: str) -> int:
     user_docs.delete_one({"study_id": study_id}).deleted_count
     conversation_docs.delete_many({"study_id": study_id})
+
+
+def reset_user(study_id: str):
+    user_docs.update_one(
+        {"study_id": study_id},
+        {
+            "$set": {"state": "not_started", "party": None},
+            "$currentDate": {"updated_at": True},
+        },
+    )
+    conversation_docs.delete_many({"study_id": study_id})
