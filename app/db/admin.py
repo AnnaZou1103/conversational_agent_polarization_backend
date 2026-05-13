@@ -3,7 +3,7 @@ import random
 import string
 from datetime import datetime, timezone
 
-from app.db.documents import conversation_docs, user_docs
+from app.db.documents import conversation_docs, conversations_archive, user_docs
 from app.schema import GetUserResponse
 
 from app.agent.strategies import Strategy
@@ -84,4 +84,9 @@ def reset_user(study_id: str):
             "$currentDate": {"updated_at": True},
         },
     )
+    doc = conversation_docs.find_one({"study_id": study_id})
+    if doc:
+        doc.pop("_id", None)
+        doc["reset_at"] = datetime.now(timezone.utc)
+        conversations_archive.insert_one(doc)
     conversation_docs.delete_many({"study_id": study_id})
