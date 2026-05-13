@@ -19,13 +19,16 @@ class Settings(BaseSettings):
     )
     enable_think: bool = False  # enable internal reasoning step before each response
 
+    # Admin
+    admin_password: str
+
     # Logging
     log_level: str = "info"
     conversations_dir: str = (
         "conversations"  # folder where per-session JSONL logs are saved
     )
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
 
 settings = Settings()
