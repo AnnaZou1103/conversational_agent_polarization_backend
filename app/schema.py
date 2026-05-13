@@ -161,4 +161,5 @@ class ControlObservation(CaseModel):
 
 
 class ChatObservation(CaseModel):
+    stage: str
     observation: Union[CIObservation, PNObservation, MCObservation, ControlObservation]

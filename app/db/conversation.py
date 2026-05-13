@@ -163,4 +163,5 @@ def get_conversation_observation(study_id: str) -> ChatObservation | None:
     if not strategy or not signals:
         return None
 
-    return ChatObservation(observation=strategy_observation[strategy](signals))
+    stage = payload.get("stage", "stage_1")
+    return ChatObservation(stage=stage, observation=strategy_observation[strategy](signals))
