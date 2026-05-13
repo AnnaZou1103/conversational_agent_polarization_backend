@@ -366,6 +366,11 @@ class AgentPipeline:
             if msg["role"] in ("user", "assistant")
         ]
 
+        # Anthropic requires at least one message; on agent-initiated open the
+        # history is empty so we inject a silent trigger.
+        if not llm_messages:
+            llm_messages = [Message(role="user", content="Hello")]
+
         full_response = []
         async for token in self.llm.stream(
             messages=llm_messages,

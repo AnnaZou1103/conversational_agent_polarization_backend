@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException
+from typing import Optional
+from fastapi import APIRouter, HTTPException, Query
 from app.db.user import (
     study_id_is_valid,
     get_user_state,
@@ -8,9 +9,23 @@ from app.db.user import (
     save_user_party,
     get_user_study_type,
 )
+from app.db.admin import create_study_user
+from app.agent.strategies import Strategy
 from app.schema import UserState, UserParty
 
 router = APIRouter(prefix="/user", tags=["User"])
+
+
+@router.post("/create")
+def create_user_route(strategy: Optional[str] = Query(default=None)):
+    valid_strategies = {s.value for s in Strategy}
+    if strategy is not None and strategy not in valid_strategies:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid strategy. Must be one of: {sorted(valid_strategies)}",
+        )
+    study_id = create_study_user(strategy=strategy)
+    return {"study_id": study_id}
 
 
 @router.get("/validate/{study_id}")

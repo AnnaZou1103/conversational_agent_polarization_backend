@@ -15,6 +15,26 @@ def generate_study_id():
     return "".join(random.choices(string.ascii_letters + string.digits, k=6))
 
 
+def create_study_user(strategy: str = None) -> str:
+    """Create a single study user. If strategy is given, use it; otherwise assign via balanced round-robin."""
+    if strategy is None:
+        strategies = [s.value for s in Strategy]
+        counts = {s: user_docs.count_documents({"type": "study", "strategy": s}) for s in strategies}
+        strategy = min(counts, key=counts.get)
+    study_id = generate_study_id()
+    user_docs.insert_one(
+        {
+            "study_id": study_id,
+            "type": "study",
+            "strategy": strategy,
+            "state": "not_started",
+            "created_at": datetime.now(timezone.utc),
+            "updated_at": datetime.now(timezone.utc),
+        }
+    )
+    return study_id
+
+
 def generate_users(count: int):
     for stragegy in list(Strategy):
         user_docs.insert_many(
