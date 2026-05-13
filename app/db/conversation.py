@@ -19,13 +19,17 @@ def get_conversation(study_id: str) -> dict:
 
 def save_turn_log(study_id: str, entry: dict):
     now = datetime.now(timezone.utc)
+    signal_snapshot = {
+        "turn": entry.get("turn"),
+        "stage": entry.get("stage"),
+        "timestamp": entry.get("timestamp"),
+        "signals": entry.get("signals", {}),
+    }
     conversation_docs.update_one(
         {"study_id": study_id},
         {
-            "$set": {
-                "payload": entry,
-                "updated_at": now,
-            },
+            "$set": {"payload": entry, "updated_at": now},
+            "$push": {"signal_history": signal_snapshot},
             "$setOnInsert": {"created_at": now},
         },
         upsert=True,
