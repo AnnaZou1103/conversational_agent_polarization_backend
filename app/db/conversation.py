@@ -158,9 +158,9 @@ def get_conversation_observation(study_id: str) -> ChatObservation | None:
         return None
 
     strategy = payload.get("strategy")
-    signals = payload.get("signals")
+    signals = payload.get("signals") or {}
 
-    if not strategy or not signals:
+    if not strategy:
         return None
 
     stage = payload.get("stage", "stage_1")
