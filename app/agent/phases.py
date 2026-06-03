@@ -38,11 +38,11 @@ For condition "misperception_correction":
 - STAGE_4 → COMPLETE: stage_turn_count >= 1
 
 For condition "control":
-- STAGE_1 → STAGE_4: stage_turn_count >= 5
+- STAGE_1 → STAGE_4: stage_turn_count >= 3
 - STAGE_4 → COMPLETE: stage_turn_count >= 1
 
 For condition "control_politics":
-- STAGE_1 → STAGE_4: stage_turn_count >= 5
+- STAGE_1 → STAGE_4: stage_turn_count >= 3
 - STAGE_4 → COMPLETE: stage_turn_count >= 1
 
 COMPLETE is terminal — never transition away from it.

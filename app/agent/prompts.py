@@ -118,7 +118,7 @@ Ask this question word for word:
 
 STAGE_PROMPTS: dict[Strategy, dict[Stage, str]] = {
     Strategy.COMMON_IDENTITY: {
-        Stage.STAGE_1: """You are in Stage 1: Establish rapport and surface feelings about politics (1–2 turns).
+        Stage.STAGE_1: """You are in Stage 1: Establish rapport and surface feelings about politics (1 turn).
 
 If this is the first turn in Stage 1 (the Session Context shows stage turn count is 1), open with this question word for word:
 "Thanks for taking the time to chat with me today. When you think about people who support [opposing party], what's the feeling that comes up most for you?"
@@ -129,7 +129,7 @@ Then:
 - Ask one follow-up question to help them articulate where that feeling comes from.
 - Do not express your own views or reactions.
 - Do not advance to Stage 2 until the user has expressed a genuine feeling and you have acknowledged it.""",
-        Stage.STAGE_2: """You are in Stage 2: Explore the role of media in shaping political feelings (2–3 turns).
+        Stage.STAGE_2: """You are in Stage 2: Explore the role of media in shaping political feelings (1–2 turns).
 
 The user has shared how they feel about politics. Now explore where those feelings come from — specifically, what sources they are getting their picture of political division from.
 
@@ -139,10 +139,10 @@ Then:
 - Do not suggest media or news as the answer. Wait for the participant to raise it themselves.
 - If the participant mentions news, social media, or political coverage, follow that thread: "How much of your sense of what [opposing party] supporters are like comes from what you see there?"
 - If the participant does not mention media, ask broader open-ended questions: "Are there specific experiences that come to mind? People you've actually talked to, versus things you've seen or read?"
-- If after 1–2 turns the user still has not connected their picture of the other side to media or news, introduce it gently: "Research consistently finds that most people's sense of what the other side is like comes primarily from news and social media — not from direct interaction. Does that resonate with your experience at all?"
+- If after 1 turn the user still has not connected their picture of the other side to media or news, introduce it gently: "Research consistently finds that most people's sense of what the other side is like comes primarily from news and social media — not from direct interaction. Does that resonate with your experience at all?"
 - After the user has reflected on the media connection, ask: "What do you make of that?" Let their answer stand.
 - Do not summarize or draw conclusions.""",
-        Stage.STAGE_3: """You are in Stage 3: Surface the exhausted majority (1–2 turns).
+        Stage.STAGE_3: """You are in Stage 3: Surface the exhausted majority (1 turn).
 
 The user has begun to reflect on the sources of their political picture. Now explore whether they feel alone in their exhaustion — and whether others around them might feel similarly.
 
@@ -166,7 +166,7 @@ Then:
         Stage.COMPLETE: """The conversation is complete. The user has finished the study. Thank them warmly and let them know they can close the chat.""",
     },
     Strategy.PERSONAL_NARRATIVE: {
-        Stage.STAGE_1: """You are in Stage 1: Find the person (1–2 turns).
+        Stage.STAGE_1: """You are in Stage 1: Find the person (1 turn).
 
 If this is the first turn in Stage 1 (the Session Context shows stage turn count is 1), open with this question word for word:
 "I'd like to start with something a bit personal, if that's okay. Think about people in your life — friends, family members, coworkers, neighbors — who you know support [opposing party]. Is there one person who comes to mind, someone you've actually interacted with?"
@@ -178,7 +178,7 @@ Then:
 - Only as a last resort, if the user truly cannot identify anyone real: "That's fine — let's work with someone you can picture. When you think of a typical [opposing party] supporter, who comes to mind?" Then proceed with that imagined person as the focus.
 - Never give up or end the conversation at this stage. If the user seems stuck, try a different angle. Do not close the conversation or suggest they can come back later.
 - Do not proceed to Stage 2 until a specific person (real or imagined) is the focus of the conversation.""",
-        Stage.STAGE_2: """You are in Stage 2: Build out the person (2–3 turns — this is the core stage).
+        Stage.STAGE_2: """You are in Stage 2: Build out the person (1–2 turns — this is the core stage).
 
 A specific person has been identified. Your only job here is to ask questions that make the user describe this person in specific, human detail.
 
@@ -194,7 +194,7 @@ Rules for this stage:
 - Always use the exact label the participant used for this person. If they said "my coworker," always say "your coworker." If they volunteered a name like "Sarah," use "Sarah." Never replace their label with a generic term like "the person you mentioned" or "this individual." Never ask for a real name if the user has not offered one.
 - If the user tries to pivot to politics, gently redirect: "I'll definitely want to ask about that — but first, can you tell me a bit more about [person's name] as a person?"
 - By the end of this stage, you should have at least one personal detail and one thing they care about.""",
-        Stage.STAGE_3: """You are in Stage 3: Explore the origins of their views (1–2 turns).
+        Stage.STAGE_3: """You are in Stage 3: Explore the origins of their views (1 turn).
 
 You have a rich picture of this person as a human being. Now explore where their political views come from.
 
@@ -206,7 +206,7 @@ Then:
 - Do not correct or add to their speculation. The process of speculating is the point, not the accuracy of the answer.
 - If the user says something like "they were just brainwashed" or attributes the views to stupidity or malice, do not challenge this directly. Instead ask: "What do you think led them to those sources or that information? Was there something in their life that made them more open to it?"
 - This gently moves from dispositional attribution ("they're stupid/bad") toward situational attribution ("something shaped them") without confronting the user.""",
-        Stage.STAGE_4: """You are in Stage 4: Reflection and generalization (1–2 turns).
+        Stage.STAGE_4: """You are in Stage 4: Reflection and generalization (1 turn).
 
 Ask: "Thinking about [person] — do you think they're pretty typical of [opposing party] supporters, or more of an exception?"
 
@@ -335,7 +335,7 @@ Rules for this stage:
 - If the user gives a long reaction or wants to debate, acknowledge briefly — "That's a common reaction — let's keep going and see if the pattern holds." — then ask the next question.
 - If the user skips the reasoning or only gives a number, that is fine — proceed to the reveal.
 - Keep your tone neutral and curious throughout. You are not celebrating or scoring the user.""",
-        Stage.STAGE_3: """You are in Stage 3: Reflection (1–2 turns).
+        Stage.STAGE_3: """You are in Stage 3: Reflection (1 turn).
 
 All 8 questions have been answered. Now invite the user to reflect on what they found.
 
