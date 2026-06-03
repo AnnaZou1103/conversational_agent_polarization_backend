@@ -238,7 +238,7 @@ Use the `questions_answered` signal from the Session Context to know which quest
 ---
 
 QUESTION 1 (ask when questions_answered == 0):
-Ask: "Here's question 1 of 8. Would MOST [opposing party] supporters support banning FAR-LEFT group rallies in the state capital?
+Ask: "Here's question 1 of 8. Would MOST [opposing party] supporters support banning [opposing wing] group rallies in the state capital?
 
   1. Never
   2. Probably not
@@ -246,7 +246,7 @@ Ask: "Here's question 1 of 8. Would MOST [opposing party] supporters support ban
   4. Definitely
 
 Please choose a number and share a brief reason for your answer."
-After their answer, acknowledge briefly then reveal: "Surveys found that the vast majority of [opposing party] voters said 'never' or 'probably not' to this."
+After their answer, acknowledge briefly then reveal: "Surveys found that most [opposing party] supporters said 'probably not' to this."
 
 QUESTION 2 (ask when questions_answered == 1):
 Ask: "Question 2 of 8. Would MOST [opposing party] supporters support prosecuting journalists who accuse [opposing party] politicians of misconduct without revealing sources?
@@ -257,7 +257,7 @@ Ask: "Question 2 of 8. Would MOST [opposing party] supporters support prosecutin
   4. Definitely
 
 Please choose a number and share a brief reason."
-After their answer, acknowledge briefly then reveal: "In national surveys, most [opposing party] voters chose 'never' or 'probably not' on this one."
+After their answer, acknowledge briefly then reveal: "In national surveys, most [opposing party] supporters said 'never' to this one."
 
 QUESTION 3 (ask when questions_answered == 2):
 Ask: "Question 3 of 8. Would MOST [opposing party] supporters support significantly reinterpreting the Constitution in order to block [user party] policies?
@@ -268,7 +268,7 @@ Ask: "Question 3 of 8. Would MOST [opposing party] supporters support significan
   4. Definitely
 
 Please choose a number and share a brief reason."
-After their answer, acknowledge briefly then reveal: "Surveys showed that the large majority of [opposing party] voters said 'never' or 'probably not'."
+After their answer, acknowledge briefly then reveal: "Surveys showed that the large majority of [opposing party] supporters said 'never'."
 
 QUESTION 4 (ask when questions_answered == 3):
 Ask: "Question 4 of 8. Would MOST [opposing party] supporters support using violence to block major [user party] laws?
@@ -279,10 +279,10 @@ Ask: "Question 4 of 8. Would MOST [opposing party] supporters support using viol
   4. Definitely
 
 Please choose a number and share a brief reason."
-After their answer, acknowledge briefly then reveal: "Survey data found that the vast majority of [opposing party] voters said 'never' or 'probably not' to this."
+After their answer, acknowledge briefly then reveal: "Survey data found that the vast majority of [opposing party] supporters said 'never' to this."
 
 QUESTION 5 (ask when questions_answered == 4):
-Ask: "Question 5 of 8. Would MOST [opposing party] supporters support reducing the number of voting stations in areas that lean [user party]?
+Ask: "Question 5 of 8. Would MOST [opposing party] supporters support reducing the number of voting stations in towns that support [user party]?
 
   1. Never
   2. Probably not
@@ -290,7 +290,7 @@ Ask: "Question 5 of 8. Would MOST [opposing party] supporters support reducing t
   4. Definitely
 
 Please choose a number and share a brief reason."
-After their answer, acknowledge briefly then reveal: "Surveys found that most [opposing party] voters said 'never' or 'probably not' on this question."
+After their answer, acknowledge briefly then reveal: "Surveys found that most [opposing party] supporters said 'never' on this question."
 
 QUESTION 6 (ask when questions_answered == 5):
 Ask: "Question 6 of 8. Would MOST [opposing party] supporters support ignoring controversial court rulings issued by [user party] judges?
@@ -301,7 +301,7 @@ Ask: "Question 6 of 8. Would MOST [opposing party] supporters support ignoring c
   4. Definitely
 
 Please choose a number and share a brief reason."
-After their answer, acknowledge briefly then reveal: "In national surveys, the large majority of [opposing party] voters chose 'never' or 'probably not'."
+After their answer, acknowledge briefly then reveal: "In national surveys, the large majority of [opposing party] supporters chose 'probably not'."
 
 QUESTION 7 (ask when questions_answered == 6):
 Ask: "Question 7 of 8. Would MOST [opposing party] supporters support not accepting the results of a presidential election they lost?
@@ -312,7 +312,7 @@ Ask: "Question 7 of 8. Would MOST [opposing party] supporters support not accept
   4. Definitely
 
 Please choose a number and share a brief reason."
-After their answer, acknowledge briefly then reveal: "Surveys found that the vast majority of [opposing party] voters said 'never' or 'probably not' to this."
+After their answer, acknowledge briefly then reveal: "Surveys found that the vast majority of [opposing party] supporters said 'never' to this."
 
 QUESTION 8 (ask when questions_answered == 7):
 Ask: "Last question — number 8 of 8. Would MOST [opposing party] supporters back laws designed to make it easier for their party — and harder for [user party] voters — to win elections?
@@ -323,7 +323,7 @@ Ask: "Last question — number 8 of 8. Would MOST [opposing party] supporters ba
   4. Definitely
 
 Please choose a number and share a brief reason."
-After their answer, acknowledge briefly then reveal: "Survey data showed that most [opposing party] voters said 'never' or 'probably not' on this as well."
+After their answer, acknowledge briefly then reveal: "Survey data showed that most [opposing party] supporters said 'never' on this as well."
 
 ---
 
@@ -527,6 +527,19 @@ def _get_user_party(political_party: str | None) -> str:
     return "[user party]"  # safe fallback before intake completes
 
 
+def _get_opposing_wing(political_party: str | None) -> str:
+    """Return the ideological wing label of the opposing party.
+
+    Democrat users ask about Republicans potentially banning FAR-LEFT rallies.
+    Republican users ask about Democrats potentially banning FAR-RIGHT rallies.
+    """
+    if political_party == "democrat":
+        return "FAR-LEFT"
+    elif political_party == "republican":
+        return "FAR-RIGHT"
+    return "[opposing wing]"
+
+
 def build_system_prompt(
     stage: Stage,
     strategy: StrategyConfig,
@@ -567,5 +580,8 @@ def build_system_prompt(
     )
     full_prompt = full_prompt.replace(
         "[user party]", _get_user_party(state.political_party)
+    )
+    full_prompt = full_prompt.replace(
+        "[opposing wing]", _get_opposing_wing(state.political_party)
     )
     return full_prompt
