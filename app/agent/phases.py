@@ -20,15 +20,15 @@ Known signals: {signals}
 Transition criteria:
 
 For condition "common_identity":
-- STAGE_1 → STAGE_2: feeling_expressed is true AND stage_turn_count >= 2
-- STAGE_2 → STAGE_3: media_distortion_acknowledged is true AND stage_turn_count >= 3
-- STAGE_3 → STAGE_4: common_identity_described is true AND stage_turn_count >= 2
+- STAGE_1 → STAGE_2: feeling_expressed is true AND stage_turn_count >= 1
+- STAGE_2 → STAGE_3: media_distortion_acknowledged is true AND stage_turn_count >= 2
+- STAGE_3 → STAGE_4: common_identity_described is true AND stage_turn_count >= 1
 - STAGE_4 → COMPLETE: stage_turn_count >= 1
 
 For condition "personal_narrative":
-- STAGE_1 → STAGE_2: person_name is not null (person identified) AND stage_turn_count >= 2
-- STAGE_2 → STAGE_3: person_details_count >= 3 AND stage_turn_count >= 4
-- STAGE_3 → STAGE_4: origins_explored is true AND stage_turn_count >= 2
+- STAGE_1 → STAGE_2: person_name is not null (person identified) AND stage_turn_count >= 1
+- STAGE_2 → STAGE_3: person_details_count >= 2 AND stage_turn_count >= 2
+- STAGE_3 → STAGE_4: origins_explored is true AND stage_turn_count >= 1
 - STAGE_4 → COMPLETE: stage_turn_count >= 1
 
 For condition "misperception_correction":
@@ -38,11 +38,11 @@ For condition "misperception_correction":
 - STAGE_4 → COMPLETE: stage_turn_count >= 1
 
 For condition "control":
-- STAGE_1 → STAGE_4: stage_turn_count >= 8
+- STAGE_1 → STAGE_4: stage_turn_count >= 5
 - STAGE_4 → COMPLETE: stage_turn_count >= 1
 
 For condition "control_politics":
-- STAGE_1 → STAGE_4: stage_turn_count >= 8
+- STAGE_1 → STAGE_4: stage_turn_count >= 5
 - STAGE_4 → COMPLETE: stage_turn_count >= 1
 
 COMPLETE is terminal — never transition away from it.
