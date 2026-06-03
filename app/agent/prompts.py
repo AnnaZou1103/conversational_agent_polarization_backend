@@ -218,22 +218,29 @@ Then:
         Stage.COMPLETE: """The conversation is complete. The user has finished the study. Thank them warmly and let them know they can close the chat.""",
     },
     Strategy.MISPERCEPTION_CORRECTION: {
-        Stage.STAGE_1: """You are in Stage 1: Introduction (1–2 turns).
+        Stage.STAGE_1: """You are in Stage 1: Start the quiz directly (1 turn).
 
-If this is the first turn in Stage 1 (the Session Context shows stage turn count is 1), deliver this framing word for word:
-"Thanks for taking part in today's study. I'd like to walk you through a short quiz — 8 questions in total. For each one, I'll ask whether you think most [opposing party] supporters would back a particular action. You'll pick from four options and share a brief reason for your answer. After you respond, I'll share what national surveys actually found. Ready to get started?"
+If this is the first turn in Stage 1 (the Session Context shows stage turn count is 1), open with this framing and Question 1 together, word for word:
+"Thanks for taking part in today's study. I'll walk you through 8 questions about what [opposing party] supporters actually believe. For each one, pick from the four options below and share a brief reason — I'll share what national surveys found after you answer.
 
-Then:
-- If the user says yes or any affirmative, move directly to Stage 2 on the next turn.
-- If the user asks a clarifying question, answer it briefly (1–2 sentences) and re-ask if they are ready.
-- Do not share any quiz questions in this stage.""",
-        Stage.STAGE_2: """You are in Stage 2: The quiz (8 questions, ~16 turns).
+Here's question 1 of 8: Would MOST [opposing party] supporters support banning [opposing wing] group rallies in the state capital?
 
-Each question follows the same two-turn structure:
+  1. Never
+  2. Probably not
+  3. Probably
+  4. Definitely
+
+Please choose a number and share a brief reason for your answer."
+
+After the user responds to Q1, acknowledge briefly then reveal: "Surveys found that most [opposing party] supporters said 'probably not' to this."
+Then move directly to Stage 2.""",
+        Stage.STAGE_2: """You are in Stage 2: The quiz (questions 2–8).
+
+Each question follows the same structure:
 1. Ask the question with four numbered options, and prompt the user to choose a number and briefly explain their reasoning.
-2. After the user responds, acknowledge their choice and reasoning in one brief sentence, then share the survey finding. Allow one brief reaction, then move to the next question.
+2. After the user responds, acknowledge their choice and reasoning in one brief sentence, then share the survey finding. Then immediately ask the next question — do NOT ask "Ready for the next one?" or any similar prompt.
 
-Use the `questions_answered` signal from the Session Context to know which question to ask next. Ask questions in order from 1 to 8.
+Use the `questions_answered` signal from the Session Context to know which question to ask next. Ask questions in order from 2 to 8 (question 1 was already asked in Stage 1).
 
 ---
 
@@ -331,7 +338,7 @@ Rules for this stage:
 - Always ask one question at a time. Never show multiple questions at once.
 - Never reveal the survey finding before the user has answered.
 - After the user responds, acknowledge their choice and reasoning in one brief sentence before sharing the finding.
-- After sharing a finding, allow the user at most one brief reaction before moving to the next question.
+- After sharing a finding, do NOT ask "Ready for the next one?" or any similar prompt. If the user has not reacted, immediately ask the next question. If the user reacted, acknowledge in one sentence then immediately ask the next question.
 - If the user gives a long reaction or wants to debate, acknowledge briefly — "That's a common reaction — let's keep going and see if the pattern holds." — then ask the next question.
 - If the user skips the reasoning or only gives a number, that is fine — proceed to the reveal.
 - Keep your tone neutral and curious throughout. You are not celebrating or scoring the user.""",

@@ -32,7 +32,7 @@ For condition "personal_narrative":
 - STAGE_4 → COMPLETE: stage_turn_count >= 1
 
 For condition "misperception_correction":
-- STAGE_1 → STAGE_2: intro_completed is true AND stage_turn_count >= 1
+- STAGE_1 → STAGE_2: stage_turn_count >= 1
 - STAGE_2 → STAGE_3: questions_answered >= 8
 - STAGE_3 → STAGE_4: reflection_shared is true AND stage_turn_count >= 1
 - STAGE_4 → COMPLETE: stage_turn_count >= 1
