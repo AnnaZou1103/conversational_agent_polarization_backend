@@ -16,7 +16,7 @@ def generate_experiment_user(strategy: str | None = None) -> str:
             "study_id": study_id,
             "type": "experiment",
             "strategy": resolved_strategy,
-            "state": "intervention",
+            "state": "pre_survey",
             "created_at": datetime.now(timezone.utc),
             "updated_at": datetime.now(timezone.utc),
         }
