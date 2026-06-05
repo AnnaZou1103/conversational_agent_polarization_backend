@@ -214,3 +214,27 @@ def test_build_session_state_handles_missing_payload():
 
     assert state.stage == Stage.STAGE_1
     assert state.signals == {}
+
+
+def test_build_session_state_restores_stage_turn_count():
+    """stage_turn_count must survive across stateless requests, otherwise gates
+    requiring stage_turn_count >= 2/3 never fire and conditions never COMPLETE."""
+    payload = _entry(stage="stage_2")
+    payload["stage_turn_count"] = 2
+    doc = {"study_id": "sid1", "payload": payload}
+
+    with patch("app.agent.state.get_conversation", return_value=doc), \
+         patch("app.agent.state.get_user_party", return_value=None):
+        state = build_session_state("sid1", "common_identity", [])
+
+    assert state.stage_turn_count == 2
+
+
+def test_build_session_state_stage_turn_count_defaults_to_zero():
+    doc = {"study_id": "sid1", "payload": _entry(stage="stage_1")}
+
+    with patch("app.agent.state.get_conversation", return_value=doc), \
+         patch("app.agent.state.get_user_party", return_value=None):
+        state = build_session_state("sid1", "common_identity", [])
+
+    assert state.stage_turn_count == 0

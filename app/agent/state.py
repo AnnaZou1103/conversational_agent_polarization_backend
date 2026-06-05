@@ -55,6 +55,12 @@ def build_session_state(
         payload = conversation["payload"]
         raw_stage = payload.get("stage", "stage_1")
         state.stage = Stage(raw_stage)
+        # Restore the per-stage turn counter. It is stateless across requests,
+        # so without this it always resets to 0 (then increments to 1), and any
+        # stage gate requiring stage_turn_count >= 2/3 could never fire — leaving
+        # conditions stuck short of COMPLETE and the "continue to survey" button
+        # never appearing.
+        state.stage_turn_count = payload.get("stage_turn_count", 0)
         state.political_party = political_party
         if political_party:
             state.signals["political_party"] = political_party

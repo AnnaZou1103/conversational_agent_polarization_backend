@@ -214,6 +214,26 @@ class AgentPipeline:
     # Sentinel yielded during blocking pipeline work to signal keep-alive
     KEEP_ALIVE = object()
 
+    async def _drive(self, task: asyncio.Task) -> AsyncIterator[object]:
+        """Await `task`, yielding KEEP_ALIVE every 2s so the caller can emit SSE
+        keep-alive comments during the blocking work. The caller retrieves the
+        result via `task.result()` after the generator is exhausted."""
+        done = asyncio.Event()
+
+        async def _watch():
+            try:
+                await task
+            finally:
+                done.set()
+
+        watcher = asyncio.create_task(_watch())
+        while not done.is_set():
+            try:
+                await asyncio.wait_for(done.wait(), timeout=2.0)
+            except asyncio.TimeoutError:
+                yield self.KEEP_ALIVE
+        await watcher
+
     async def process_turn(
         self,
         messages: list[dict],
@@ -290,30 +310,39 @@ class AgentPipeline:
 
             # Clean message — reset the consecutive-reminder streak and record this
             # message for exact-repeat detection on the next turn.
+            #
+            # The reset must be PERSISTED, not just held in memory. Safety
+            # counters are rebuilt each (stateless) request from the stored
+            # `verdict`, which is only written on reminder/terminate events. If
+            # we don't persist the clean verdict here, a clean message between
+            # two reminders would never actually break the streak — so
+            # non-consecutive reminders would accumulate to a wrongful
+            # termination, contradicting the documented "a single clean message
+            # resets the streak" rule. Only write when there is a streak to
+            # clear, to avoid a DB round-trip on every clean turn.
+            if state.consecutive_reminders:
+                log_safety_event(settings.conversations_dir, state, verdict)
             state.consecutive_reminders = 0
             state.previous_user_message = user_message
 
-        # --- OBSERVE + STAGE EVALUATION ---
+        # --- OBSERVE, THEN STAGE EVALUATION ---
+        # OBSERVE must complete BEFORE the stage gate runs: the transition
+        # criteria (questions_answered, feeling_expressed, person_name, …) read
+        # signals that OBSERVE extracts from THIS user message. Running them
+        # concurrently made the gate read previous-turn signals, delaying every
+        # signal-gated transition by a full turn.
         if state.turn_count >= 1:
             observe_task = asyncio.create_task(
                 self._observe(state, user_message, previous_assistant_message)
             )
+            async for keep_alive in self._drive(observe_task):
+                yield keep_alive
+
             stage_task = asyncio.create_task(
                 self.stage_controller.evaluate_transition(state, user_message)
             )
-            done = asyncio.Event()
-
-            async def _wait_and_signal():
-                await asyncio.gather(observe_task, stage_task)
-                done.set()
-
-            waiter = asyncio.create_task(_wait_and_signal())
-            while not done.is_set():
-                try:
-                    await asyncio.wait_for(done.wait(), timeout=2.0)
-                except asyncio.TimeoutError:
-                    yield self.KEEP_ALIVE
-            await waiter
+            async for keep_alive in self._drive(stage_task):
+                yield keep_alive
             stage = stage_task.result()
         else:
             stage = state.stage
@@ -335,19 +364,8 @@ class AgentPipeline:
 
         if settings.enable_think and state.turn_count >= 1:
             think_task = asyncio.create_task(self._think(state, user_message))
-            done_event = asyncio.Event()
-
-            async def _wait_think():
-                await think_task
-                done_event.set()
-
-            waiter = asyncio.create_task(_wait_think())
-            while not done_event.is_set():
-                try:
-                    await asyncio.wait_for(done_event.wait(), timeout=2.0)
-                except asyncio.TimeoutError:
-                    yield self.KEEP_ALIVE
-            await waiter
+            async for keep_alive in self._drive(think_task):
+                yield keep_alive
 
             if think_task.done():
                 think_context = think_task.result()

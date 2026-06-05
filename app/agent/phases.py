@@ -8,6 +8,17 @@ from app.llm.base import LLMProvider, Message
 
 logger = logging.getLogger(__name__)
 
+# Canonical stage ordering. Transitions may only move forward (or stay): control
+# conditions legitimately skip STAGE_1 -> STAGE_4, but a backward jump would
+# reset stage_turn_count and could loop a session so it never reaches COMPLETE.
+_STAGE_ORDER = (
+    Stage.STAGE_1,
+    Stage.STAGE_2,
+    Stage.STAGE_3,
+    Stage.STAGE_4,
+    Stage.COMPLETE,
+)
+
 # Stage transition evaluation prompt
 STAGE_EVAL_PROMPT = """You are a stage controller for a partisan animosity research study agent.
 The agent guides users through a structured conversation in one of several conditions.
@@ -88,6 +99,16 @@ class StageController:
             )
             result = json.loads(response.strip().strip("```json").strip("```"))
             next_stage = Stage(result["next_stage"].lower())
+            # Reject backward transitions: stages only advance or stay. A
+            # regression would reset stage_turn_count and risk an infinite loop
+            # that never reaches COMPLETE.
+            if _STAGE_ORDER.index(next_stage) < _STAGE_ORDER.index(state.stage):
+                logger.warning(
+                    "Rejected backward stage transition %s -> %s",
+                    state.stage.value,
+                    next_stage.value,
+                )
+                return state.stage
             if next_stage != state.stage:
                 logger.info(
                     "Stage transition: %s -> %s (%s)",
