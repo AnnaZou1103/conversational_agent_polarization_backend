@@ -20,6 +20,7 @@ app = FastAPI(
 origins = [
     "http://localhost:3000",
     "https://conversational-agent-polarization.vercel.app",
+    "https://conversational-agent-frontend-b8f9b1baaad0.herokuapp.com",
 ]
 
 app.add_middleware(
