@@ -14,6 +14,7 @@ from app.llm.registry import get_provider
 from app.db.user import study_id_is_valid
 from app.db.conversation import (
     get_chat_history,
+    get_conversation,
     get_conversation_observation,
 )
 
@@ -149,12 +150,19 @@ async def chat_completions(request: ChatCompletionRequest):
                 continue
             full_response.append(token)
 
+        # process_turn has already persisted this turn, so the stage is current.
+        stage, conversation_complete = _get_stage_info(
+            (get_conversation(study_id) or {}).get("payload")
+        )
+
         return {
             "id": completion_id,
             "object": "chat.completion",
             "created": int(time.time()),
             "model": request.model,
             "study_id": study_id,
+            "stage": stage,
+            "conversation_complete": conversation_complete,
             "choices": [
                 {
                     "index": 0,
@@ -225,12 +233,21 @@ async def _stream_response(
         }
         yield f"data: {json.dumps(chunk)}\n\n"
 
-    # Final chunk
+    # Final chunk — surface completion so the frontend can show the "Continue to
+    # Survey" button immediately. process_turn has already persisted this turn
+    # by the time the loop ends, so the stage read here is current. This avoids
+    # relying on a separate /observation poll, whose timing made the button
+    # appear only after an extra user message.
+    stage, conversation_complete = _get_stage_info(
+        (get_conversation(study_id) or {}).get("payload") if study_id else None
+    )
     final_chunk = {
         "id": completion_id,
         "object": "chat.completion.chunk",
         "created": created,
         "model": model_id,
+        "stage": stage,
+        "conversation_complete": conversation_complete,
         "choices": [
             {
                 "index": 0,

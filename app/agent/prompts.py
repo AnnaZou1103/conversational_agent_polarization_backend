@@ -162,7 +162,7 @@ Close with this question word for word:
 Then:
 - Do not suggest answers. Let the user respond in their own words.
 - Do not evaluate or add to what the user says.
-- Thank them genuinely and end the conversation.""",
+- Do not say goodbye or close the conversation yet — the closing happens after the user responds. Let their answer stand.""",
         Stage.COMPLETE: """The conversation is complete. The user has finished the study. Thank them warmly and let them know they can close the chat.""",
     },
     Strategy.PERSONAL_NARRATIVE: {
@@ -214,7 +214,7 @@ Then:
 - If the user says "exception," follow up: "What makes them feel like an exception to you? What would the more typical [opposing party] supporter look like?"
 - Close with: "Is there anything about our conversation — or about thinking through [person] — that shifts how you see [opposing party] supporters more broadly, even slightly?"
 - Do not summarize or editorialize. Let the user's answer stand.
-- Thank them genuinely and end the conversation.""",
+- Do not say goodbye or close the conversation yet — the closing happens after the user responds.""",
         Stage.COMPLETE: """The conversation is complete. The user has finished the study. Thank them warmly and let them know they can close the chat.""",
     },
     Strategy.MISPERCEPTION_CORRECTION: {
@@ -361,9 +361,8 @@ Close with this question word for word:
 
 Then:
 - Do not evaluate or add to what the user says.
-- Thank them genuinely: "Thank you — that's exactly the kind of honest reflection this study is designed to capture. You can go ahead and close this chat whenever you're ready."
-- End the conversation.""",
-        Stage.COMPLETE: """The conversation is complete. The user has finished the study. Thank them warmly and let them know they can close the chat.""",
+- Do not thank-and-close or say goodbye yet — let the user respond first. The closing happens in the next step.""",
+        Stage.COMPLETE: """The conversation is complete. The user has finished the study. Thank them warmly for their honest reflection — that it's exactly the kind of thoughtful engagement this study is designed to capture — and let them know they're all done and can close the chat whenever they're ready.""",
     },
     Strategy.CONTROL: {
         Stage.STAGE_1: """You are in the main conversation stage of the control condition.
@@ -380,9 +379,9 @@ Then:
         Stage.STAGE_3: """Continue the conversation. If the user seems to be winding down, ask: "Is there anything else going on for you lately that you'd like to talk about?" """,
         Stage.STAGE_4: """You are wrapping up the conversation.
 
-Close with: "Before we finish — is there anything else you'd like to share about how you've been feeling?"
+Ask: "Before we finish — is there anything else you'd like to share about how you've been feeling?"
 
-Then thank them genuinely and end the conversation.""",
+Wait for the user's response. Do not say goodbye or close the conversation yet — the closing happens in the next step.""",
         Stage.COMPLETE: """The conversation is complete. The user has finished the study. Thank them warmly and let them know they can close the chat.""",
     },
     Strategy.CONTROL_POLITICS: {
@@ -400,9 +399,9 @@ Then:
         Stage.STAGE_3: """Continue the conversation. If the user seems to be winding down, ask: "Is there anything else about the political situation you've been thinking about lately?" """,
         Stage.STAGE_4: """You are wrapping up the conversation.
 
-Close with: "Before we finish — is there anything else about politics you'd like to share?"
+Ask: "Before we finish — is there anything else about politics you'd like to share?"
 
-Then thank them genuinely and end the conversation.""",
+Wait for the user's response. Do not say goodbye or close the conversation yet — the closing happens in the next step.""",
         Stage.COMPLETE: """The conversation is complete. The user has finished the study. Thank them warmly and let them know they can close the chat.""",
     },
 }

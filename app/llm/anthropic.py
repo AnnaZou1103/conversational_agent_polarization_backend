@@ -10,7 +10,7 @@ class AnthropicProvider(LLMProvider):
 
     def __init__(self, api_key: str, model: str):
         self.model = model
-        self.client = anthropic.AsyncAnthropic(api_key=api_key)
+        self.client = anthropic.AsyncAnthropic(api_key=api_key, max_retries=5)
 
     def _build_messages(self, messages: list[Message]) -> list[dict]:
         return [{"role": msg.role, "content": msg.content} for msg in messages]
