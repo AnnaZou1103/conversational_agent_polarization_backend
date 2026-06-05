@@ -155,3 +155,65 @@ def test_stage_gate_sees_freshly_observed_signals():
     assert llm.stage_prompt_saw_8 is True, (
         "stage gate ran before OBSERVE updated signals (saw stale questions_answered)"
     )
+
+
+# ---------------------------------------------------------------------------
+# 3. POST-COMPLETION re-entry short-circuit (process_turn)
+# ---------------------------------------------------------------------------
+
+class _CountingLLM(LLMProvider):
+    """Records whether the pipeline made any LLM call at all."""
+
+    def __init__(self) -> None:
+        self.complete_calls = 0
+        self.stream_calls = 0
+
+    async def complete(self, messages, system=None, temperature=0.7, max_tokens=2048) -> str:
+        self.complete_calls += 1
+        return json.dumps({"next_stage": "complete", "reasoning": "x"})
+
+    async def stream(self, messages, system=None, temperature=0.7, max_tokens=2048) -> AsyncIterator[str]:
+        self.stream_calls += 1
+        yield "should-not-happen"
+
+
+def test_post_completion_message_short_circuits():
+    """Once a prior turn persisted stage=complete, a new user message must NOT
+    run the pipeline or generate another agent turn — it returns a brief ack."""
+    from app.agent.pipeline import COMPLETION_REENTRY_MESSAGE
+
+    llm = _CountingLLM()
+    pipeline = AgentPipeline(llm=llm)
+
+    doc = {
+        "study_id": "sid",
+        "payload": {
+            "stage": "complete",
+            "strategy": "common_identity",
+            "stage_turn_count": 1,
+            "signals": {},
+        },
+    }
+    messages = [
+        {"role": "assistant", "content": "You're all done!"},
+        {"role": "user", "content": "ok"},
+    ]
+
+    async def _consume():
+        out = []
+        async for tok in pipeline.process_turn(
+            messages=messages, strategy_name="common_identity", study_id="sid"
+        ):
+            out.append(tok)
+        return out
+
+    with patch("app.agent.state.get_conversation", return_value=doc), \
+         patch("app.agent.state.get_user_party", return_value=None), \
+         patch("app.agent.pipeline.log_turn") as mock_log_turn, \
+         patch("app.agent.pipeline.log_safety_event"):
+        out = asyncio.run(_consume())
+
+    assert "".join(t for t in out if isinstance(t, str)) == COMPLETION_REENTRY_MESSAGE
+    assert llm.complete_calls == 0, "no OBSERVE/STAGE/THINK calls after completion"
+    assert llm.stream_calls == 0, "no response generation after completion"
+    assert mock_log_turn.call_count == 0, "re-entry pings should not be logged as turns"

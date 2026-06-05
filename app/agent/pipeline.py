@@ -22,6 +22,14 @@ from app.llm.base import LLMProvider, Message
 
 logger = logging.getLogger(__name__)
 
+# Sent when the user keeps chatting after the conversation already reached
+# COMPLETE (the "Continue to Survey" button is showing). We acknowledge briefly
+# instead of running the pipeline and generating another full closing message.
+COMPLETION_REENTRY_MESSAGE = (
+    "You're all done with the conversation — please continue to the survey "
+    "whenever you're ready."
+)
+
 
 def _extract_json_object(text: str) -> str:
     """Pull the first balanced JSON object out of a model response.
@@ -253,6 +261,16 @@ class AgentPipeline:
         # Short-circuit any subsequent requests to an already-terminated session.
         if state.terminated_by_safety:
             yield TERMINATION_REENTRY_MESSAGE
+            return
+
+        # The conversation already reached COMPLETE on a previous turn (the
+        # survey button is showing). A restored stage of COMPLETE means a prior
+        # turn closed it out — the turn that FIRST reaches COMPLETE restores an
+        # earlier stage and still generates its closing message below. Here we
+        # just acknowledge briefly so post-completion chatter doesn't keep
+        # spawning new agent turns.
+        if state.stage == Stage.COMPLETE:
+            yield COMPLETION_REENTRY_MESSAGE
             return
 
         state.stage_turn_count += 1
