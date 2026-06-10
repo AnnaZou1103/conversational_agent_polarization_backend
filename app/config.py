@@ -9,6 +9,13 @@ class Settings(BaseSettings):
     llm_base_url: str | None = None  # optional override for OpenAI-compatible endpoints
     llm_api_version: str = "2024-12-01-preview"  # Azure OpenAI API version
 
+    # Fast model used for internal pipeline steps (OBSERVE / THINK / stage
+    # evaluation) where a cheaper, lower-latency model is sufficient. These run
+    # on the critical path before the user sees any tokens, so shaving their
+    # latency directly reduces perceived response time. Empty falls back to
+    # llm_model (no behavior change). Same provider/key as the main model.
+    fast_llm_model: str = ""  # e.g. "gpt-4o-mini" or "claude-haiku-4-5-20251001"
+
     # Server configuration
     api_host: str = "0.0.0.0"
     api_port: int = 8080

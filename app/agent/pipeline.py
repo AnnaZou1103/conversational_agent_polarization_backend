@@ -72,9 +72,16 @@ def _extract_json_object(text: str) -> str:
 class AgentPipeline:
     """Core agent pipeline implementing plan-execute-observe loop."""
 
-    def __init__(self, llm: LLMProvider):
+    def __init__(self, llm: LLMProvider, fast_llm: LLMProvider | None = None):
+        # `llm` (LLM_MODEL) generates the user-facing reply (EXECUTE) and runs
+        # the THINK planning step — THINK benefits from the strong main model
+        # and its output is internal, so it doesn't add latency to the visible
+        # stream. `fast_llm` runs the fast internal steps (OBSERVE / stage
+        # evaluation), where a cheaper, lower-latency model is sufficient and
+        # directly cuts time-to-first-token. Defaults to `llm` when unset.
         self.llm = llm
-        self.stage_controller = StageController(llm)
+        self.fast_llm = fast_llm or llm
+        self.stage_controller = StageController(self.fast_llm)
 
     async def _observe(
         self,
@@ -106,7 +113,7 @@ class AgentPipeline:
 
         try:
             response = await asyncio.wait_for(
-                self.llm.complete(
+                self.fast_llm.complete(
                     messages=[Message(role="user", content=prompt)],
                     temperature=0.1,
                     max_tokens=512,

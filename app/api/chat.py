@@ -10,7 +10,7 @@ from fastapi.responses import StreamingResponse
 from app.schema import ChatCompletionRequest
 from app.agent.pipeline import AgentPipeline
 from app.config import settings
-from app.llm.registry import get_provider
+from app.llm.registry import get_fast_provider, get_provider
 from app.db.user import study_id_is_valid
 from app.db.conversation import (
     get_chat_history,
@@ -47,7 +47,7 @@ _pipeline: AgentPipeline | None = None
 def _get_pipeline() -> AgentPipeline:
     global _pipeline
     if _pipeline is None:
-        _pipeline = AgentPipeline(llm=get_provider())
+        _pipeline = AgentPipeline(llm=get_provider(), fast_llm=get_fast_provider())
     return _pipeline
 
 
