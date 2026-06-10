@@ -98,9 +98,18 @@ Rules you must follow at all times:
 - After the user responds, acknowledge their choice and reasoning in one brief sentence before sharing the finding.
 - Keep your turns concise. After sharing a finding, allow the user a brief reaction, then move to the next question.
 - If the user wants to discuss at length, acknowledge briefly — "That's a common reaction — let's keep going and see if the pattern holds." — then continue.
-- If the user declines to answer or skips the reasoning, say: "That's fine — I'll just share the finding."
+- If the user only gives a number without any reasoning, do NOT reveal the finding yet. Ask once for their reasoning, e.g.: "Got it — before I share what surveys found, could you say a little about why you picked that?" If the user then gives a reason, proceed to the reveal. If the user explicitly declines or skips again, say: "That's fine — I'll just share the finding." and proceed.
 - If the user asks what the purpose of the study is, say: "We're exploring how people think and feel about things going on in their lives. There are no right or wrong answers — your honest responses are exactly what we're after." """,
 }
+
+# Human-like writing style — one short line folded into every prompt.
+# Even when an instruction quotes wording to use, keep the meaning but smooth
+# out dashes into natural punctuation.
+HUMAN_STYLE_RULES = (
+    "Write like a real person, not a survey or chatbot: never use em or en dashes "
+    '("—", "–") in your replies (use a comma, a period, or a new sentence instead), '
+    "use everyday contractions, and keep phrasing warm, plain, and unscripted."
+)
 
 # ---------------------------------------------------------------------------
 # Stage-specific instructions — per condition × per stage
@@ -340,7 +349,7 @@ Rules for this stage:
 - After the user responds, acknowledge their choice and reasoning in one brief sentence before sharing the finding.
 - After sharing a finding, do NOT ask "Ready for the next one?" or any similar prompt. If the user has not reacted, immediately ask the next question. If the user reacted, acknowledge in one sentence then immediately ask the next question.
 - If the user gives a long reaction or wants to debate, acknowledge briefly — "That's a common reaction — let's keep going and see if the pattern holds." — then ask the next question.
-- If the user skips the reasoning or only gives a number, that is fine — proceed to the reveal.
+- If the user only gives a number without any reasoning, do NOT reveal the finding yet. Ask once for their reasoning, e.g.: "Got it — before I share what surveys found, could you say a little about why you picked that?" If the user then gives a reason, proceed to the reveal. If the user explicitly declines or skips again, proceed to the reveal without pressing further.
 - Keep your tone neutral and curious throughout. You are not celebrating or scoring the user.""",
         Stage.STAGE_3: """You are in Stage 3: Reflection (1 turn).
 
@@ -577,6 +586,8 @@ def build_system_prompt(
         for k, v in state.signals.items():
             if v not in (None, False, 0, []):
                 context_lines.append(f"  - {k}: {v}")
+
+    context_lines.append(f"- Style: {HUMAN_STYLE_RULES}")
 
     parts.append("\n".join(context_lines))
 
