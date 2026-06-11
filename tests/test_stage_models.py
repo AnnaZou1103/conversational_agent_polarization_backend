@@ -4,7 +4,7 @@ Drives the real AgentPipeline.process_turn with two distinct providers — a
 "MAIN" model and a "FAST" model — and asserts the per-stage routing:
 
   OBSERVE        -> fast_llm   (FAST)
-  Stage eval     -> fast_llm   (FAST)
+  Stage eval     -> deterministic rule table (NO LLM call)
   THINK          -> llm        (MAIN)   [only when enable_think]
   EXECUTE stream -> llm        (MAIN)
 
@@ -117,11 +117,13 @@ def _run_turn(enable_think: bool) -> list[tuple[str, str]]:
     return calls
 
 
-def test_observe_and_stage_run_on_fast_model() -> None:
+def test_observe_runs_on_fast_model_and_stage_makes_no_llm_call() -> None:
     calls = _run_turn(enable_think=False)
     routing = {step: label for label, step in calls}  # step -> model label
     assert routing.get("observe") == "FAST", calls
-    assert routing.get("stage") == "FAST", calls
+    # The stage gate is now a deterministic rule table — it must make NO LLM
+    # call at all (the single biggest critical-path latency win).
+    assert routing.get("stage") is None, calls
     assert routing.get("execute") == "MAIN", calls
 
 
@@ -129,7 +131,7 @@ def test_think_runs_on_main_model() -> None:
     calls = _run_turn(enable_think=True)
     routing = {step: label for label, step in calls}
     assert routing.get("observe") == "FAST", calls
-    assert routing.get("stage") == "FAST", calls
+    assert routing.get("stage") is None, calls  # deterministic gate, no LLM call
     assert routing.get("think") == "MAIN", calls
     assert routing.get("execute") == "MAIN", calls
 
