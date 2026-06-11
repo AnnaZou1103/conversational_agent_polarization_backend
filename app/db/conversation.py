@@ -116,6 +116,13 @@ def _get_misperception_correction_observation(signals: dict) -> MCObservation:
     question_answers = signals.get("question_answers", {})
     questions: list[QuizQuestion] = []
 
+    # Use the SAME opposing-party label that the quiz questions use, so the
+    # fact wording matches the question wording ("Republican" / "Democratic").
+    # Imported lazily to avoid a circular import (prompts -> state -> conversation).
+    from app.agent.prompts import _get_opposing_party
+
+    opposing_party = _get_opposing_party(signals.get("political_party"))
+
     for question in QUIZ_QUESTIONS:
         question_id = question.get("id")
         if question_id not in question_answers:
@@ -126,11 +133,13 @@ def _get_misperception_correction_observation(signals: dict) -> MCObservation:
         except (TypeError, ValueError):
             continue
 
+        survey_average = question.get("survey_average", "").format(party=opposing_party)
+
         questions.append(
             QuizQuestion(
                 label=question.get("label"),
                 user_answer=user_answer,
-                survey_average=question.get("survey_average"),
+                survey_average=survey_average,
             )
         )
 

@@ -148,7 +148,7 @@ class PNObservation(CaseModel):
 class QuizQuestion(CaseModel):
     label: str
     user_answer: int
-    survey_average: float
+    survey_average: str
 
 
 class MCObservation(CaseModel):
