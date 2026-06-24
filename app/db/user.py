@@ -19,10 +19,13 @@ def get_user_agent_strategy(study_id: str) -> AgentStrategy:
 def get_user_state(study_id: str) -> UserState:
     user_doc = user_docs.find_one(
         {"study_id": study_id},
-        {"_id": 0, "state": 1},
+        {"_id": 0, "state": 1, "screened": 1},
     )
 
-    return UserState(state=user_doc.get("state", "not_started"))
+    return UserState(
+        state=user_doc.get("state", "not_started"),
+        screened=user_doc.get("screened", False),
+    )
 
 
 def get_user_party(study_id: str) -> UserParty | None:
@@ -40,7 +43,10 @@ def get_user_party(study_id: str) -> UserParty | None:
 def advance_user_state(study_id: str, next_state: UserState):
     user_docs.update_one(
         {"study_id": study_id},
-        {"$set": {"state": next_state.state}, "$currentDate": {"updated_at": True}},
+        {
+            "$set": {"state": next_state.state, "screened": next_state.screened},
+            "$currentDate": {"updated_at": True},
+        },
     )
 
 

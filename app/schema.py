@@ -63,6 +63,7 @@ class UserState(CaseModel):
         "post_survey",
         "complete",
     ]
+    screened: bool = False
 
 
 class AgentStrategy(CaseModel):
