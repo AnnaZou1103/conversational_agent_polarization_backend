@@ -533,8 +533,101 @@ _COMMON_WORDS = frozenset(
         "unemployment",
         "welfare",
         "security",
+        # personality traits (personal_narrative asks users to describe a
+        # specific person — single-trait answers like "stubborn" are the
+        # expected response, not an edge case)
+        "stubborn",
+        "caring",
+        "kind",
+        "mean",
+        "generous",
+        "selfish",
+        "honest",
+        "dishonest",
+        "loyal",
+        "supportive",
+        "judgmental",
+        "passionate",
+        "patient",
+        "impatient",
+        "smart",
+        "hardworking",
+        "lazy",
+        "funny",
+        "serious",
+        "warm",
+        "cold",
+        "stubbornness",
+        # relationship / family roles (the person personal_narrative asks
+        # about is usually introduced with just a label like this)
+        "uncle",
+        "aunt",
+        "cousin",
+        "brother",
+        "sister",
+        "mom",
+        "dad",
+        "mother",
+        "father",
+        "grandma",
+        "grandpa",
+        "grandmother",
+        "grandfather",
+        "neighbor",
+        "coworker",
+        "boss",
+        "classmate",
+        "roommate",
+        "husband",
+        "wife",
+        "spouse",
+        "partner",
+        "church",
+        "thanksgiving",
+        "holiday",
+        "holidays",
+        # media / common_identity vocabulary
+        "fox",
+        "cnn",
+        "msnbc",
+        "twitter",
+        "facebook",
+        "instagram",
+        "tiktok",
+        "youtube",
+        "algorithm",
+        "clickbait",
+        "outrage",
+        "biased",
+        "unbiased",
+        "bias",
+        "misinformation",
+        "echo",
+        "chamber",
+        "headline",
+        "headlines",
+        "coverage",
+        "outlet",
+        "outlets",
+        "anchor",
+        "pundit",
+        "exhausting",
     }
 )
+
+
+def _looks_like_a_name(msg: str) -> bool:
+    """True if every alphabetic token is capitalized (e.g. "Sarah", "My uncle Bob").
+
+    Names can't be enumerated in `_COMMON_WORDS`, so a short reply where every
+    word starts with a capital letter is treated as a likely proper noun
+    rather than gibberish. Checked against the ORIGINAL casing, before
+    `_normalize` lowercases everything.
+    """
+    words = re.findall(r"[A-Za-z]+", msg)
+    if not words:
+        return False
+    return all(w[0].isupper() for w in words)
 
 
 def _normalize(msg: str) -> str:
@@ -636,6 +729,14 @@ def is_gibberish(msg: str, quiz_mode: bool = False) -> bool:
         return False
 
     if quiz_mode:
+        return False
+
+    # A capitalized word/phrase (checked against ORIGINAL casing, before
+    # normalization) reads as a likely proper noun — e.g. a person's name in
+    # personal_narrative ("Sarah", "My uncle Bob"). Names can't be enumerated
+    # in _COMMON_WORDS, so the soft signal below would otherwise flag every
+    # name it hasn't seen.
+    if _looks_like_a_name(msg):
         return False
 
     # Soft signal — require both short-ish length AND no recognized word

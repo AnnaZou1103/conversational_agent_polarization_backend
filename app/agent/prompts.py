@@ -172,7 +172,7 @@ Then:
 - Do not suggest answers. Let the user respond in their own words.
 - Do not evaluate or add to what the user says.
 - Do not say goodbye or close the conversation yet — the closing happens after the user responds. Let their answer stand.""",
-        Stage.COMPLETE: """The conversation is complete. The user has finished the study. Thank them warmly and let them know they can close the chat. Do not ask any question — this message is the closing message, not a turn to continue the conversation.""",
+        Stage.COMPLETE: """The conversation is complete. First, briefly and warmly acknowledge what the user just shared in their last message — reference something specific from it so they know you heard them. Then thank them and let them know they can close the chat. Do not ask any question — this message is the closing message, not a turn to continue the conversation.""",
     },
     Strategy.PERSONAL_NARRATIVE: {
         Stage.STAGE_1: """You are in Stage 1: Find the person (1 turn).
@@ -224,7 +224,7 @@ Then:
 - Close with: "Is there anything about our conversation — or about thinking through [person] — that shifts how you see [opposing party] supporters more broadly, even slightly?"
 - Do not summarize or editorialize. Let the user's answer stand.
 - Do not say goodbye or close the conversation yet — the closing happens after the user responds.""",
-        Stage.COMPLETE: """The conversation is complete. The user has finished the study. Thank them warmly and let them know they can close the chat. Do not ask any question — this message is the closing message, not a turn to continue the conversation.""",
+        Stage.COMPLETE: """The conversation is complete. First, briefly and warmly acknowledge what the user just shared in their last message — reference something specific from it so they know you heard them. Then thank them and let them know they can close the chat. Do not ask any question — this message is the closing message, not a turn to continue the conversation.""",
     },
     Strategy.MISPERCEPTION_CORRECTION: {
         Stage.STAGE_1: """You are in Stage 1: Start the quiz directly (1 turn).
@@ -371,7 +371,7 @@ Close with this question word for word:
 Then:
 - Do not evaluate or add to what the user says.
 - Do not thank-and-close or say goodbye yet — let the user respond first. The closing happens in the next step.""",
-        Stage.COMPLETE: """The conversation is complete. The user has finished the study. Thank them warmly for their honest reflection — that it's exactly the kind of thoughtful engagement this study is designed to capture — and let them know they're all done and can close the chat whenever they're ready. Do not ask any question — this message is the closing message, not a turn to continue the conversation.""",
+        Stage.COMPLETE: """The conversation is complete. First, briefly acknowledge what the user just shared in their last message — reference something specific from it so they know you heard them. Then thank them warmly for their honest reflection — that it's exactly the kind of thoughtful engagement this study is designed to capture — and let them know they're all done and can close the chat whenever they're ready. Do not ask any question — this message is the closing message, not a turn to continue the conversation.""",
     },
     Strategy.CONTROL: {
         Stage.STAGE_1: """You are in the main conversation stage of the control condition.
