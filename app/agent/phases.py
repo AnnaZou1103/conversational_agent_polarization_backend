@@ -63,13 +63,29 @@ _TRANSITIONS: dict[str, list[tuple[Stage, Stage, Predicate]]] = {
          lambda s, n: bool(s.get("reflection_shared")) and n >= 1),
         (Stage.STAGE_4, Stage.COMPLETE, lambda s, n: n >= 1),
     ],
+    # Content-driven: wait for the user to signal they're winding down (OBSERVE
+    # re-evaluates `winding_down` fresh every turn off the user's latest message
+    # — it is NOT a sticky fact, so a user who says "actually, one more thing"
+    # after appearing done correctly un-flags it). The turn-count floor (n>=2)
+    # stops the agent from cutting Stage 1 short on a single message.
+    #
+    # In practice most users never volunteer an explicit "I'm done" — they just
+    # keep answering follow-ups (the base prompt always asks one), so a session
+    # relying solely on `winding_down` can run indefinitely. The caps (n>=5 /
+    # n>=2) bound that, matching the study's original 3-5 minute target; the
+    # STAGE_1 prompt also now proactively checks in around turn 4 instead of
+    # waiting for the user to bring up closing.
     "control": [
-        (Stage.STAGE_1, Stage.STAGE_4, lambda s, n: n >= 3),
-        (Stage.STAGE_4, Stage.COMPLETE, lambda s, n: n >= 1),
+        (Stage.STAGE_1, Stage.STAGE_4,
+         lambda s, n: (bool(s.get("winding_down")) and n >= 2) or n >= 5),
+        (Stage.STAGE_4, Stage.COMPLETE,
+         lambda s, n: bool(s.get("winding_down")) or n >= 2),
     ],
     "control_politics": [
-        (Stage.STAGE_1, Stage.STAGE_4, lambda s, n: n >= 3),
-        (Stage.STAGE_4, Stage.COMPLETE, lambda s, n: n >= 1),
+        (Stage.STAGE_1, Stage.STAGE_4,
+         lambda s, n: (bool(s.get("winding_down")) and n >= 2) or n >= 5),
+        (Stage.STAGE_4, Stage.COMPLETE,
+         lambda s, n: bool(s.get("winding_down")) or n >= 2),
     ],
 }
 

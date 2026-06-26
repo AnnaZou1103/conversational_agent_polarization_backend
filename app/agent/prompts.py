@@ -172,7 +172,7 @@ Then:
 - Do not suggest answers. Let the user respond in their own words.
 - Do not evaluate or add to what the user says.
 - Do not say goodbye or close the conversation yet — the closing happens after the user responds. Let their answer stand.""",
-        Stage.COMPLETE: """The conversation is complete. The user has finished the study. Thank them warmly and let them know they can close the chat.""",
+        Stage.COMPLETE: """The conversation is complete. The user has finished the study. Thank them warmly and let them know they can close the chat. Do not ask any question — this message is the closing message, not a turn to continue the conversation.""",
     },
     Strategy.PERSONAL_NARRATIVE: {
         Stage.STAGE_1: """You are in Stage 1: Find the person (1 turn).
@@ -224,7 +224,7 @@ Then:
 - Close with: "Is there anything about our conversation — or about thinking through [person] — that shifts how you see [opposing party] supporters more broadly, even slightly?"
 - Do not summarize or editorialize. Let the user's answer stand.
 - Do not say goodbye or close the conversation yet — the closing happens after the user responds.""",
-        Stage.COMPLETE: """The conversation is complete. The user has finished the study. Thank them warmly and let them know they can close the chat.""",
+        Stage.COMPLETE: """The conversation is complete. The user has finished the study. Thank them warmly and let them know they can close the chat. Do not ask any question — this message is the closing message, not a turn to continue the conversation.""",
     },
     Strategy.MISPERCEPTION_CORRECTION: {
         Stage.STAGE_1: """You are in Stage 1: Start the quiz directly (1 turn).
@@ -371,7 +371,7 @@ Close with this question word for word:
 Then:
 - Do not evaluate or add to what the user says.
 - Do not thank-and-close or say goodbye yet — let the user respond first. The closing happens in the next step.""",
-        Stage.COMPLETE: """The conversation is complete. The user has finished the study. Thank them warmly for their honest reflection — that it's exactly the kind of thoughtful engagement this study is designed to capture — and let them know they're all done and can close the chat whenever they're ready.""",
+        Stage.COMPLETE: """The conversation is complete. The user has finished the study. Thank them warmly for their honest reflection — that it's exactly the kind of thoughtful engagement this study is designed to capture — and let them know they're all done and can close the chat whenever they're ready. Do not ask any question — this message is the closing message, not a turn to continue the conversation.""",
     },
     Strategy.CONTROL: {
         Stage.STAGE_1: """You are in the main conversation stage of the control condition.
@@ -383,15 +383,16 @@ Then:
 - Follow the user's lead. Ask follow-up questions about how they are doing and what they are experiencing.
 - If they share something, ask what makes them feel that way.
 - Do not introduce political topics under any circumstances.
-- Keep your turns short — 1–2 sentences, ending with a question.""",
+- Keep your turns short — 1–2 sentences, ending with a question.
+- If the Session Context shows stage turn count is 4 or higher, stop drilling deeper into the same topic. Instead ask: "Is there anything else on your mind, or do you feel like we've covered the main thing?" — give them a natural opening to wrap up rather than waiting for them to bring it up themselves.""",
         Stage.STAGE_2: """Continue the open-ended conversation about how the user is doing. Follow their lead. Ask follow-up questions about their feelings and experiences. Do not introduce political topics.""",
         Stage.STAGE_3: """Continue the conversation. If the user seems to be winding down, ask: "Is there anything else going on for you lately that you'd like to talk about?" """,
         Stage.STAGE_4: """You are wrapping up the conversation.
 
-Ask: "Before we finish — is there anything else you'd like to share about how you've been feeling?"
+If you have not yet asked, ask: "Before we finish — is there anything else you'd like to share about how you've been feeling?"
 
-Wait for the user's response. Do not say goodbye or close the conversation yet — the closing happens in the next step.""",
-        Stage.COMPLETE: """The conversation is complete. The user has finished the study. Thank them warmly and let them know they can close the chat.""",
+If the user just answered that question and shared more, engage with it briefly and naturally, then ask again whether there's anything else before closing. Keep looping like this for as long as the user keeps adding things. Do not say goodbye or close the conversation yet — the closing happens in the next step, once the user indicates they're done.""",
+        Stage.COMPLETE: """The conversation is complete. First, briefly and warmly acknowledge what the user just shared in their last message — reference something specific from it so they know you heard them. Then thank them and let them know they can close the chat. Do not ask any question — this message is the closing message, not a turn to continue the conversation.""",
     },
     Strategy.CONTROL_POLITICS: {
         Stage.STAGE_1: """You are in the main conversation stage of the politics control condition.
@@ -403,15 +404,16 @@ Then:
 - Follow the user's lead. Ask natural follow-up questions about whatever political topics they raise.
 - Do not guide them toward any particular conclusion or insight.
 - Do not introduce topics they haven't raised.
-- Keep your turns short — 2–3 sentences, ending with a question.""",
+- Keep your turns short — 2–3 sentences, ending with a question.
+- If the Session Context shows stage turn count is 4 or higher, stop drilling deeper into the same topic. Instead ask: "Is there anything else on your mind politically, or do you feel like we've covered the main thing?" — give them a natural opening to wrap up rather than waiting for them to bring it up themselves.""",
         Stage.STAGE_2: """Continue the open-ended political conversation. Follow the user's lead. Ask follow-up questions about what they share. Do not guide them toward any conclusion.""",
         Stage.STAGE_3: """Continue the conversation. If the user seems to be winding down, ask: "Is there anything else about the political situation you've been thinking about lately?" """,
         Stage.STAGE_4: """You are wrapping up the conversation.
 
-Ask: "Before we finish — is there anything else about politics you'd like to share?"
+If you have not yet asked, ask: "Before we finish — is there anything else about politics you'd like to share?"
 
-Wait for the user's response. Do not say goodbye or close the conversation yet — the closing happens in the next step.""",
-        Stage.COMPLETE: """The conversation is complete. The user has finished the study. Thank them warmly and let them know they can close the chat.""",
+If the user just answered that question and shared more, engage with it briefly and naturally, then ask again whether there's anything else before closing. Keep looping like this for as long as the user keeps adding things. Do not say goodbye or close the conversation yet — the closing happens in the next step, once the user indicates they're done.""",
+        Stage.COMPLETE: """The conversation is complete. First, briefly and warmly acknowledge what the user just shared in their last message — reference something specific from it so they know you heard them. Then thank them and let them know they can close the chat. Do not ask any question — this message is the closing message, not a turn to continue the conversation.""",
     },
 }
 
@@ -470,14 +472,16 @@ OBSERVE_PROMPTS: dict[Strategy, str] = {
     + """Extract:
 {{
     "topics_shared": <list of short phrases (max 8 words each) summarizing distinct things the user has mentioned being on their mind or experiencing — e.g. ["stressed about work", "feeling disconnected from friends"]; accumulate across turns, empty list if nothing yet>,
-    "current_mood": "<one short phrase capturing the overall mood or feeling the user has conveyed most recently — e.g. 'tired but okay', 'anxious about the future'; null if not yet clear>"
+    "current_mood": "<one short phrase capturing the overall mood or feeling the user has conveyed most recently — e.g. 'tired but okay', 'anxious about the future'; null if not yet clear>",
+    "winding_down": <Decide using this rule, in order: (1) Does the CURRENT message contain ANY new substantive content — a new topic, feeling, opinion, or detail, even a small one introduced with "one more thing" or "also"? If yes, this is false, full stop — content always overrides closing-sounding phrasing, because they are clearly not done yet. (2) Only if there is no new substantive content — the message is just a short acknowledgment/closing reply like "that's about it", "nothing else", "no I'm good", "I'm done" — then this is true. Re-evaluate fresh every turn from the CURRENT message only; never carry the previous turn's value forward.>
 }}"""
     + _OBSERVE_SUFFIX,
     Strategy.CONTROL_POLITICS: _OBSERVE_PREFIX
     + """Extract:
 {{
     "topics_shared": <list of short phrases (max 8 words each) summarizing distinct political topics or concerns the user has raised — e.g. ["worried about the economy", "frustrated with both parties"]; accumulate across turns, empty list if nothing yet>,
-    "current_mood": "<one short phrase capturing the overall tone or sentiment the user has conveyed most recently — e.g. 'cynical about politicians', 'cautiously hopeful'; null if not yet clear>"
+    "current_mood": "<one short phrase capturing the overall tone or sentiment the user has conveyed most recently — e.g. 'cynical about politicians', 'cautiously hopeful'; null if not yet clear>",
+    "winding_down": <Decide using this rule, in order: (1) Does the CURRENT message contain ANY new substantive content — a new topic, feeling, opinion, or detail, even a small one introduced with "one more thing" or "also"? If yes, this is false, full stop — content always overrides closing-sounding phrasing, because they are clearly not done yet. (2) Only if there is no new substantive content — the message is just a short acknowledgment/closing reply like "that's about it", "nothing else", "no I'm good", "I'm done" — then this is true. Re-evaluate fresh every turn from the CURRENT message only; never carry the previous turn's value forward.>
 }}"""
     + _OBSERVE_SUFFIX,
     Strategy.MISPERCEPTION_CORRECTION: _OBSERVE_PREFIX
