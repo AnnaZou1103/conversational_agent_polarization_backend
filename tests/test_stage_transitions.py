@@ -127,11 +127,26 @@ def test_misperception_quiz_gate() -> None:
 
 def test_control_skips_to_stage_4() -> None:
     for strategy in ("control", "control_politics"):
-        s = _evaluate(strategy, Stage.STAGE_1, 2, {})
-        assert s.stage == Stage.STAGE_1, strategy  # needs >= 3
+        # Still talking (no winding_down signal, under the turn cap) -> stays put.
         s = _evaluate(strategy, Stage.STAGE_1, 3, {})
-        assert s.stage == Stage.STAGE_4, strategy  # skips 2 and 3 legitimately
-        s = _evaluate(strategy, Stage.STAGE_4, 1, {})
+        assert s.stage == Stage.STAGE_1, strategy
+        # winding_down but under the floor (n=1) -> stays put, don't cut it short.
+        s = _evaluate(strategy, Stage.STAGE_1, 1, {"winding_down": True})
+        assert s.stage == Stage.STAGE_1, strategy
+        # winding_down and past the floor -> advances (skips 2 and 3 legitimately).
+        s = _evaluate(strategy, Stage.STAGE_1, 2, {"winding_down": True})
+        assert s.stage == Stage.STAGE_4, strategy
+        # Turn-count safety net fires even without the signal.
+        s = _evaluate(strategy, Stage.STAGE_1, 5, {})
+        assert s.stage == Stage.STAGE_4, strategy
+        # In Stage 4, still has more to add -> stays put.
+        s = _evaluate(strategy, Stage.STAGE_4, 1, {"winding_down": False})
+        assert s.stage == Stage.STAGE_4, strategy
+        # Signals done -> completes.
+        s = _evaluate(strategy, Stage.STAGE_4, 1, {"winding_down": True})
+        assert s.stage == Stage.COMPLETE, strategy
+        # Turn-count safety net fires even without the signal.
+        s = _evaluate(strategy, Stage.STAGE_4, 2, {})
         assert s.stage == Stage.COMPLETE, strategy
 
 

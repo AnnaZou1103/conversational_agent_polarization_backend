@@ -22,6 +22,13 @@ from app.llm.base import LLMProvider, Message
 
 logger = logging.getLogger(__name__)
 
+# Boolean signal fields that reflect only the user's CURRENT message and must
+# be able to flip back to false (e.g. someone who seemed done adds "actually,
+# one more thing"). The merge logic below otherwise only writes booleans when
+# true — the right default for sticky facts like `feeling_expressed`, which
+# should never un-assert once established, but wrong for these.
+_NON_STICKY_BOOL_SIGNALS = frozenset({"winding_down"})
+
 # Sent when the user keeps chatting after the conversation already reached
 # COMPLETE (the "Continue to Survey" button is showing). We acknowledge briefly
 # instead of running the pipeline and generating another full closing message.
@@ -29,6 +36,24 @@ COMPLETION_REENTRY_MESSAGE = (
     "You're all done with the conversation — please continue to the survey "
     "whenever you're ready."
 )
+
+# Conditions whose stage gate depends ONLY on stage_turn_count, with no semantic
+# signal from OBSERVE. For these, OBSERVE's output is cosmetic (it feeds the
+# conversation log and the "Established signals" context block, but gates
+# nothing), so OBSERVE runs CONCURRENTLY with EXECUTE instead of blocking
+# time-to-first-token — saving ~1.3s/turn on these conditions. It is awaited
+# before the turn is logged so persisted signals stay correct.
+#
+# control / control_politics used to qualify here, but their stage gate is now
+# content-driven (waits for OBSERVE's `winding_down` signal so the conversation
+# doesn't get cut off mid-thought) — see app.agent.phases._TRANSITIONS — so
+# OBSERVE must stay on the critical path for them too. Currently empty: every
+# condition has at least one signal-gated transition.
+#
+# Keep in sync with app.agent.phases._TRANSITIONS: every condition with a
+# signal-gated transition must keep OBSERVE on the critical path so the
+# deterministic gate sees signals from THIS turn.
+_OBSERVE_OFF_CRITICAL_PATH = frozenset()
 
 
 def _extract_json_object(text: str) -> str:
@@ -129,7 +154,7 @@ class AgentPipeline:
                 if value is None:
                     continue
                 if isinstance(value, bool):
-                    if value:
+                    if value or key in _NON_STICKY_BOOL_SIGNALS:
                         state.signals[key] = value
                 elif isinstance(value, int):
                     state.signals[key] = max(state.signals.get(key, 0), value)
@@ -350,18 +375,29 @@ class AgentPipeline:
             state.consecutive_reminders = 0
             state.previous_user_message = user_message
 
-        # --- OBSERVE, THEN STAGE EVALUATION ---
-        # OBSERVE must complete BEFORE the stage gate runs: the transition
-        # criteria (questions_answered, feeling_expressed, person_name, …) read
-        # signals that OBSERVE extracts from THIS user message. Running them
-        # concurrently made the gate read previous-turn signals, delaying every
-        # signal-gated transition by a full turn.
+        # --- OBSERVE + STAGE EVALUATION ---
+        # The stage gate is deterministic (see StageController) and reads the
+        # signals OBSERVE extracts from THIS user message. For signal-gated
+        # conditions OBSERVE must therefore complete BEFORE the gate; running
+        # them concurrently made the gate read previous-turn signals, delaying
+        # every signal-gated transition by a full turn.
+        #
+        # For _OBSERVE_OFF_CRITICAL_PATH conditions the gate is purely
+        # stage_turn_count based, so OBSERVE gates nothing — we start it here but
+        # do NOT await it, letting it overlap with EXECUTE below (awaited before
+        # logging), which keeps its ~1.3s off time-to-first-token.
+        deferred_observe_task = None
         if state.turn_count >= 1:
-            observe_task = asyncio.create_task(
-                self._observe(state, user_message, previous_assistant_message)
-            )
-            async for keep_alive in self._drive(observe_task):
-                yield keep_alive
+            if state.strategy in _OBSERVE_OFF_CRITICAL_PATH:
+                deferred_observe_task = asyncio.create_task(
+                    self._observe(state, user_message, previous_assistant_message)
+                )
+            else:
+                observe_task = asyncio.create_task(
+                    self._observe(state, user_message, previous_assistant_message)
+                )
+                async for keep_alive in self._drive(observe_task):
+                    yield keep_alive
 
             stage_task = asyncio.create_task(
                 self.stage_controller.evaluate_transition(state, user_message)
@@ -421,6 +457,13 @@ class AgentPipeline:
         ):
             full_response.append(token)
             yield token
+
+        # Await the deferred OBSERVE (control conditions) so this turn's signals
+        # are captured by log_turn below. It ran concurrently with EXECUTE, so by
+        # now it has almost always finished; this only guarantees the ordering.
+        if deferred_observe_task is not None:
+            async for keep_alive in self._drive(deferred_observe_task):
+                yield keep_alive
 
         # --- POST-OBSERVE ---
         assistant_response = "".join(full_response)
