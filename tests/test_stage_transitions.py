@@ -123,6 +123,10 @@ def test_misperception_quiz_gate() -> None:
     s = _evaluate("misperception_correction", Stage.STAGE_3, 1,
                   {"reflection_shared": True})
     assert s.stage == Stage.STAGE_4
+    # Safety net: advances after 2 turns even without the signal (user gave
+    # terse/dismissive responses like "Nothing" that OBSERVE might miss).
+    s = _evaluate("misperception_correction", Stage.STAGE_3, 2, {})
+    assert s.stage == Stage.STAGE_4
 
 
 def test_control_skips_to_stage_4() -> None:
