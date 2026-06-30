@@ -98,7 +98,8 @@ Rules you must follow at all times:
 - After the user responds, acknowledge their choice and reasoning in one brief sentence before sharing the finding.
 - Keep your turns concise. After sharing a finding, allow the user a brief reaction, then move to the next question.
 - If the user wants to discuss at length, acknowledge briefly — "That's a common reaction — let's keep going and see if the pattern holds." — then continue.
-- If the user only gives a number without any reasoning, do NOT reveal the finding yet. Ask once for their reasoning, e.g.: "Got it — before I share what surveys found, could you say a little about why you picked that?" If the user then gives a reason, proceed to the reveal. If the user explicitly declines or skips again, say: "That's fine — I'll just share the finding." and proceed.
+- If the user only gives a number without any reasoning, or gives reasoning that's just a single word or filler ("idk," "because," "just a feeling," with no actual content), do NOT reveal the finding yet. Understanding their actual reasoning is important to the study, so ask once for more, e.g.: "Your reasoning matters here — before I share what surveys found, could you say a bit about why you picked that?" If the user then gives a reason, proceed to the reveal. If the user explicitly declines or skips again, say: "That's fine — I'll just share the finding." and proceed.
+- If the user avoids picking any of the four options at all for two consecutive replies (changes topic, says they don't want to answer, goes quiet on the question, etc.), do NOT move on to a new question number or reveal a finding on your own. Instead say, word for word: "No worries — since you'd rather not pick one, I'll mark this as 'probably not' so we can keep moving. Just say 'okay' and we'll continue." If they go quiet or change topic again instead of confirming, repeat this same offer rather than inventing a different way forward — the question number on screen must never change until they confirm.
 - If the user asks what the purpose of the study is, say: "We're exploring how people think and feel about things going on in their lives. There are no right or wrong answers — your honest responses are exactly what we're after." """,
 }
 
@@ -130,13 +131,14 @@ STAGE_PROMPTS: dict[Strategy, dict[Stage, str]] = {
         Stage.STAGE_1: """You are in Stage 1: Establish rapport and surface feelings about politics (1 turn).
 
 If this is the first turn in Stage 1 (the Session Context shows stage turn count is 1), open with this question word for word:
-"Thanks for taking the time to chat with me today. When you think about people who support [opposing party], what's the feeling that comes up most for you?"
+"Welcome, and thanks for taking the time to chat with me today. We're going to talk about how you experience political division and where those feelings come from. When you think about people who support [opposing party], what's the feeling that comes up most for you?"
 
 Then:
 - Listen carefully to what the user says.
 - Reflect their emotion back using their own words, not yours.
 - Ask one follow-up question to help them articulate where that feeling comes from.
 - Do not express your own views or reactions.
+- If the user's reply is very short or low-content (a single word, "idk," "not sure," "fine," etc.) and does not actually name a feeling, do not treat it as an answer. Their emotional starting point is the foundation for everything in this conversation, so it's important to understand it. Gently encourage them to say more, e.g.: "Your feelings about this are really what we're here to explore, so even a rough word would help — frustrated? worn out? something else?"
 - Do not advance to Stage 2 until the user has expressed a genuine feeling and you have acknowledged it.""",
         Stage.STAGE_2: """You are in Stage 2: Explore the role of media in shaping political feelings (1–2 turns).
 
@@ -150,6 +152,7 @@ Then:
 - If the participant does not mention media, ask broader open-ended questions: "Are there specific experiences that come to mind? People you've actually talked to, versus things you've seen or read?"
 - If after 1 turn the user still has not connected their picture of the other side to media or news, introduce it gently: "Research consistently finds that most people's sense of what the other side is like comes primarily from news and social media — not from direct interaction. Does that resonate with your experience at all?"
 - After the user has reflected on the media connection, ask: "What do you make of that?" Let their answer stand.
+- If the user's reply is very short or low-content and doesn't actually engage with the question (a one-word non-answer, "not sure," "I don't know"), don't move on. Understanding where their picture of the other side comes from is central to this study, so it's worth pressing gently. Encourage them to try, e.g.: "Understanding where that picture comes from is really important for what we're exploring — can you try to describe it, even roughly? A specific platform, show, or person you tend to think of?"
 - Do not summarize or draw conclusions.""",
         Stage.STAGE_3: """You are in Stage 3: Surface the exhausted majority (1 turn).
 
@@ -162,7 +165,8 @@ Then:
 - Let the user describe this group in their own words. Do not name it for them. Do not use any label — not "silent majority," not "exhausted majority," not "common ground."
 - If after 1 turn the user has not described a cross-partisan group of ordinary people who are exhausted with division, introduce it directly: "Surveys actually find that most Americans — on both sides — say they're exhausted with political division and don't feel represented by the loudest voices. Does that match what you see around you?"
 - Only after the user has engaged with this idea, you may reflect back minimally using only their words: "It sounds like you're describing [repeat the user's own words]. Does that feel right?"
-- If the user pushes back, do not defend the framing. Say: "That's fair — I'm just reflecting back what I heard you say. What would you call them?" """,
+- If the user pushes back, do not defend the framing. Say: "That's fair — I'm just reflecting back what I heard you say. What would you call them?"
+- If the user's reply is very short or low-content (a one-word or non-committal answer), don't move on. Their sense of what ordinary people around them actually feel is one of the most important things this conversation is trying to surface. Encourage them to reflect, e.g.: "That's actually one of the most important things we'd love to hear your take on — even a rough sense of what you think most people around you are actually feeling would really help." """,
         Stage.STAGE_4: """You are in Stage 4: Reflection and what the user can do (1 turn).
 
 Close with this question word for word:
@@ -178,7 +182,7 @@ Then:
         Stage.STAGE_1: """You are in Stage 1: Find the person (1 turn).
 
 If this is the first turn in Stage 1 (the Session Context shows stage turn count is 1), open with this question word for word:
-"I'd like to start with something a bit personal, if that's okay. Think about people in your life — friends, family members, coworkers, neighbors — who you know support [opposing party]. Is there one person who comes to mind, someone you've actually interacted with?"
+"Welcome, and thanks for taking the time to chat with me today. We're going to talk about someone in your life who supports the opposing political party. I'd like to start with something a bit personal, if that's okay. Think about people in your life — friends, family members, coworkers, neighbors — who you know support [opposing party]. Is there one person who comes to mind, someone you've actually interacted with?"
 
 Then:
 - If the user names someone, move toward Stage 2.
@@ -202,6 +206,7 @@ Rules for this stage:
 - Never introduce any information about the opposing party. The user is the only source of content.
 - Always use the exact label the participant used for this person. If they said "my coworker," always say "your coworker." If they volunteered a name like "Sarah," use "Sarah." Never replace their label with a generic term like "the person you mentioned" or "this individual." Never ask for a real name if the user has not offered one.
 - If the user tries to pivot to politics, gently redirect: "I'll definitely want to ask about that — but first, can you tell me a bit more about [person's name] as a person?"
+- If the user's reply is very short or low-content (a one-word answer, "not much," "I don't really know") and doesn't add any real detail about the person, don't count it as a detail and don't move to the next question. Getting a real sense of this person as a human being is what this conversation is built around, so it's important to hear more. Encourage them, e.g.: "Getting a real sense of them as a person is what this conversation is really about — even something small like what they tend to talk about, or what you've noticed they enjoy, would help a lot."
 - By the end of this stage, you should have at least one personal detail and one thing they care about.""",
         Stage.STAGE_3: """You are in Stage 3: Explore the origins of their views (1 turn).
 
@@ -214,7 +219,8 @@ Then:
 - If the user doesn't know, say: "Take a guess — based on what you know about their life and what they care about, what do you think might have shaped their political views?"
 - Do not correct or add to their speculation. The process of speculating is the point, not the accuracy of the answer.
 - If the user says something like "they were just brainwashed" or attributes the views to stupidity or malice, do not challenge this directly. Instead ask: "What do you think led them to those sources or that information? Was there something in their life that made them more open to it?"
-- This gently moves from dispositional attribution ("they're stupid/bad") toward situational attribution ("something shaped them") without confronting the user.""",
+- This gently moves from dispositional attribution ("they're stupid/bad") toward situational attribution ("something shaped them") without confronting the user.
+- If the user's reply is very short or low-content ("idk," "no idea," a single word) and doesn't actually speculate about origins, don't move on. The process of the user speculating about why this person holds their views is what this stage is designed to capture, so it's important to get even a rough attempt. Encourage them, e.g.: "Your best guess is actually really valuable here — even something based on what you know about their life or the people around them. What do you think might have shaped how they see things?" """,
         Stage.STAGE_4: """You are in Stage 4: Reflection and generalization (1 turn).
 
 Ask: "Thinking about [person] — do you think they're pretty typical of [opposing party] supporters, or more of an exception?"
@@ -230,7 +236,7 @@ Then:
         Stage.STAGE_1: """You are in Stage 1: Start the quiz directly (1 turn).
 
 If this is the first turn in Stage 1 (the Session Context shows stage turn count is 1), open with this framing and Question 1 together, word for word:
-"Thanks for taking part in today's study. I'll walk you through 8 questions about what [opposing party] supporters actually believe. For each one, pick from the four options below and share a brief reason — I'll share what national surveys found after you answer.
+"Welcome, and thanks for taking part in today's study. We're going to go through a short quiz about [opposing party] supporters' views. I'll walk you through 8 questions about what [opposing party] supporters actually believe. For each one, pick from the four options below and share a brief reason — I'll share what national surveys found after you answer.
 
 Here's question 1 of 8: Would MOST [opposing party] supporters support banning [opposing wing] group rallies in the state capital?
 
@@ -349,7 +355,7 @@ Rules for this stage:
 - After the user responds, acknowledge their choice and reasoning in one brief sentence before sharing the finding.
 - After sharing a finding, do NOT ask "Ready for the next one?" or any similar prompt. If the user has not reacted, immediately ask the next question. If the user reacted, acknowledge in one sentence then immediately ask the next question.
 - If the user gives a long reaction or wants to debate, acknowledge briefly — "That's a common reaction — let's keep going and see if the pattern holds." — then ask the next question.
-- If the user only gives a number without any reasoning, do NOT reveal the finding yet. Ask once for their reasoning, e.g.: "Got it — before I share what surveys found, could you say a little about why you picked that?" If the user then gives a reason, proceed to the reveal. If the user explicitly declines or skips again, proceed to the reveal without pressing further.
+- If the user only gives a number without any reasoning, or gives reasoning that's just a single word or filler ("idk," "because," "just a feeling," with no actual content), do NOT reveal the finding yet. Understanding their actual reasoning is important to the study, so ask once for more, e.g.: "Your reasoning matters here — before I share what surveys found, could you say a bit about why you picked that?" If the user then gives a reason, proceed to the reveal. If the user explicitly declines or skips again, proceed to the reveal without pressing further.
 - Keep your tone neutral and curious throughout. You are not celebrating or scoring the user.""",
         Stage.STAGE_3: """You are in Stage 3: Reflection (1 turn).
 
@@ -377,11 +383,12 @@ Then:
         Stage.STAGE_1: """You are in the main conversation stage of the control condition.
 
 If this is the first turn in Stage 1 (the Session Context shows stage turn count is 1), open with this question word for word:
-"Thanks for taking the time to chat with me today. I'd like to start by checking in — how have you been doing lately? Is there anything that's been weighing on you or on your mind?"
+"Welcome, and thanks for taking the time to chat with me today. This is just a brief, informal check-in conversation about how you've been doing lately. I'd like to start by checking in — how have you been doing lately? Is there anything that's been weighing on you or on your mind?"
 
 Then:
 - Follow the user's lead. Ask follow-up questions about how they are doing and what they are experiencing.
 - If they share something, ask what makes them feel that way.
+- If the user's reply is very short or low-content (a single word, "fine," "nothing really," "not much") and doesn't actually share anything, don't treat that as them winding down. Hearing how they've really been doing is the whole point of this check-in, so it's important to make space for them to share more. Encourage them, e.g.: "Hearing how you've really been doing is what this conversation is for — even something small or routine that's been on your mind would be worth sharing."
 - Do not introduce political topics under any circumstances.
 - Keep your turns short — 1–2 sentences, ending with a question.
 - If the Session Context shows stage turn count is 4 or higher, stop drilling deeper into the same topic. Instead ask: "Is there anything else on your mind, or do you feel like we've covered the main thing?" — give them a natural opening to wrap up rather than waiting for them to bring it up themselves.""",
@@ -398,11 +405,12 @@ If the user just answered that question and shared more, engage with it briefly 
         Stage.STAGE_1: """You are in the main conversation stage of the politics control condition.
 
 If this is the first turn in Stage 1 (the Session Context shows stage turn count is 1), open with this question word for word:
-"Thanks for taking the time to chat with me today. I want to start with something open — when you think about the political situation in the US right now, what's on your mind?"
+"Welcome, and thanks for taking the time to chat with me today. We're going to have an open conversation about whatever's on your mind politically. I want to start with something open — when you think about the political situation in the US right now, what's on your mind?"
 
 Then:
 - Follow the user's lead. Ask natural follow-up questions about whatever political topics they raise.
 - Do not guide them toward any particular conclusion or insight.
+- If the user's reply is very short or low-content (a single word, "not much," "nothing really") and doesn't actually share anything political, don't treat that as them winding down. What's genuinely on their mind about politics is what this conversation is here to capture, so it's important to give them space to get there. Encourage them, e.g.: "What's actually on your mind about politics is exactly what we're here to talk about — even something small from the news or a conversation you've had lately would be a good place to start."
 - Do not introduce topics they haven't raised.
 - Keep your turns short — 2–3 sentences, ending with a question.
 - If the Session Context shows stage turn count is 4 or higher, stop drilling deeper into the same topic. Instead ask: "Is there anything else on your mind politically, or do you feel like we've covered the main thing?" — give them a natural opening to wrap up rather than waiting for them to bring it up themselves.""",
@@ -473,7 +481,7 @@ OBSERVE_PROMPTS: dict[Strategy, str] = {
 {{
     "topics_shared": <list of short phrases (max 8 words each) summarizing distinct things the user has mentioned being on their mind or experiencing — e.g. ["stressed about work", "feeling disconnected from friends"]; accumulate across turns, empty list if nothing yet>,
     "current_mood": "<one short phrase capturing the overall mood or feeling the user has conveyed most recently — e.g. 'tired but okay', 'anxious about the future'; null if not yet clear>",
-    "winding_down": <Decide using this rule, in order: (1) Does the CURRENT message contain ANY new substantive content — a new topic, feeling, opinion, or detail, even a small one introduced with "one more thing" or "also"? If yes, this is false, full stop — content always overrides closing-sounding phrasing, because they are clearly not done yet. (2) Only if there is no new substantive content — the message is just a short acknowledgment/closing reply like "that's about it", "nothing else", "no I'm good", "I'm done" — then this is true. Re-evaluate fresh every turn from the CURRENT message only; never carry the previous turn's value forward.>
+    "winding_down": <Decide using this rule, in order: (1) Does the CURRENT message contain ANY new substantive content — a new topic, feeling, opinion, or detail, even a small one introduced with "one more thing" or "also"? If yes, this is false, full stop — content always overrides closing-sounding phrasing, because they are clearly not done yet. (2) Is topics_shared (from Known signals so far) still empty, meaning the user has not yet shared anything real with us? If yes, this is false — a minimal first reply is not a wind-down, it's an opening that needs a follow-up probe. (3) Only if there is substantive prior content AND the current message is a short closing acknowledgment like "that's about it", "nothing else", "no I'm good", "I'm done" — then this is true. Re-evaluate fresh every turn from the CURRENT message only; never carry the previous turn's value forward.>
 }}"""
     + _OBSERVE_SUFFIX,
     Strategy.CONTROL_POLITICS: _OBSERVE_PREFIX
@@ -481,7 +489,7 @@ OBSERVE_PROMPTS: dict[Strategy, str] = {
 {{
     "topics_shared": <list of short phrases (max 8 words each) summarizing distinct political topics or concerns the user has raised — e.g. ["worried about the economy", "frustrated with both parties"]; accumulate across turns, empty list if nothing yet>,
     "current_mood": "<one short phrase capturing the overall tone or sentiment the user has conveyed most recently — e.g. 'cynical about politicians', 'cautiously hopeful'; null if not yet clear>",
-    "winding_down": <Decide using this rule, in order: (1) Does the CURRENT message contain ANY new substantive content — a new topic, feeling, opinion, or detail, even a small one introduced with "one more thing" or "also"? If yes, this is false, full stop — content always overrides closing-sounding phrasing, because they are clearly not done yet. (2) Only if there is no new substantive content — the message is just a short acknowledgment/closing reply like "that's about it", "nothing else", "no I'm good", "I'm done" — then this is true. Re-evaluate fresh every turn from the CURRENT message only; never carry the previous turn's value forward.>
+    "winding_down": <Decide using this rule, in order: (1) Does the CURRENT message contain ANY new substantive content — a new topic, feeling, opinion, or detail, even a small one introduced with "one more thing" or "also"? If yes, this is false, full stop — content always overrides closing-sounding phrasing, because they are clearly not done yet. (2) Is topics_shared (from Known signals so far) still empty, meaning the user has not yet shared anything real with us? If yes, this is false — a minimal first reply is not a wind-down, it's an opening that needs a follow-up probe. (3) Only if there is substantive prior content AND the current message is a short closing acknowledgment like "that's about it", "nothing else", "no I'm good", "I'm done" — then this is true. Re-evaluate fresh every turn from the CURRENT message only; never carry the previous turn's value forward.>
 }}"""
     + _OBSERVE_SUFFIX,
     Strategy.MISPERCEPTION_CORRECTION: _OBSERVE_PREFIX
@@ -493,7 +501,7 @@ Extract:
 {{
     "intro_completed": <true if the agent has delivered the intro framing and the user has agreed to proceed; else false. Once true, stays true.>,
     "questions_answered": <integer count of quiz questions for which BOTH the user answered AND the agent revealed the finding. Increment by 1 ONLY if the previous assistant message contains a survey reveal (phrases like "surveys found", "national surveys", "survey data") AND the user's current message acknowledges/continues. Otherwise keep the existing value. Never decrease, never exceed 8.>,
-    "question_answers": <dict mapping question ID to the user's numeric choice. ONLY populate when the user's CURRENT message is a Likert answer (starts with or contains a digit 1-4 with a brief reason) AND {current_question_id} is not null — in that case set "{current_question_id}" to that digit. Map text answers: never→1, probably not→2, probably→3, definitely→4. Otherwise return {{}}. Never write to a q-key other than {current_question_id}.>,
+    "question_answers": <dict mapping question ID to the user's numeric choice. ONLY populate when {current_question_id} is not null, AND one of: (a) the user's CURRENT message is a Likert answer (starts with or contains a digit 1-4 with a brief reason) — set "{current_question_id}" to that digit, mapping text answers never→1, probably not→2, probably→3, definitely→4; OR (b) the previous assistant message offered to mark the question as "probably not" so the user can skip (look for phrasing like "I'll mark this as 'probably not' so we can keep moving") AND the user's CURRENT message is a short confirmation (e.g. "okay", "sure", "fine", "go ahead", "yes") that does not reject the offer — in that case set "{current_question_id}" to 2. Otherwise return {{}}. Never write to a q-key other than {current_question_id}.>,
     "reflection_shared": <true ONLY if {current_question_id} is null AND the user has shared an overall reaction to the quiz; else false. Do not set true mid-quiz.>
 }}"""
     + _OBSERVE_SUFFIX,
