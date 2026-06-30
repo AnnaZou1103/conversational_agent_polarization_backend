@@ -831,6 +831,195 @@ def test_stage4_completes_on_turn_2_even_without_signal() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Pipeline integration: probing language present in system prompt on filler turn
+# ---------------------------------------------------------------------------
+
+class _CapturingLLM(LLMProvider):
+    """Dual-role LLM stub used in integration tests.
+
+    complete() handles OBSERVE — returns minimal JSON so no signals advance.
+    stream() handles EXECUTE — records the system prompt passed by the pipeline.
+    """
+
+    def __init__(self, observe_json: dict | None = None) -> None:
+        self._observe_json = json.dumps(observe_json or {})
+        self.captured_system: str | None = None
+
+    async def complete(
+        self, messages, system=None, temperature=0.7, max_tokens=2048
+    ) -> str:
+        return self._observe_json
+
+    async def stream(
+        self, messages, system=None, temperature=0.7, max_tokens=2048
+    ) -> AsyncIterator[str]:
+        self.captured_system = system
+        yield "ok"
+
+
+def _run_process_turn(
+    llm: _CapturingLLM,
+    doc: dict,
+    messages: list[dict],
+) -> None:
+    """Drive process_turn to completion with DB and logging patched out."""
+    pipeline = AgentPipeline(llm=llm)
+
+    async def _consume() -> None:
+        async for _ in pipeline.process_turn(
+            messages=messages,
+            strategy_name="misperception_correction",
+            study_id="sid",
+        ):
+            pass
+
+    with (
+        patch("app.agent.state.get_conversation", return_value=doc),
+        patch("app.agent.state.get_user_party", return_value=None),
+        patch("app.agent.pipeline.log_turn"),
+        patch("app.agent.pipeline.log_safety_event"),
+        patch("app.config.settings.enable_think", False),
+    ):
+        asyncio.run(_consume())
+
+
+def test_system_prompt_contains_probing_language_on_filler_answer() -> None:
+    """When a user gives a short filler answer in Stage 2 and the previous agent
+    message has no survey-reveal phrase, the system prompt sent to the LLM must
+    contain the instruction to probe for substantive reasoning before revealing.
+
+    This catches regressions where the Stage 2 prompt loses its 'ask for more'
+    instruction, which would let the LLM skip the reasoning gate silently.
+    """
+    llm = _CapturingLLM(observe_json={})  # OBSERVE advances nothing
+
+    doc = {
+        "study_id": "sid",
+        "payload": {
+            "stage": "stage_2",
+            "strategy": "misperception_correction",
+            "stage_turn_count": 2,
+            "signals": {
+                "question_answers": {"q1": "2", "q2": "3"},
+            },
+        },
+    }
+    # Pipeline is already probing (no "surveys found" in previous message)
+    messages = [
+        {"role": "assistant", "content": "Question 2 of 8: How many ..."},
+        {"role": "user", "content": "3"},
+        {
+            "role": "assistant",
+            "content": (
+                "Your reasoning matters here — before I share what surveys found, "
+                "could you say a bit about why you picked that?"
+            ),
+        },
+        {"role": "user", "content": "idk"},
+    ]
+
+    _run_process_turn(llm, doc, messages)
+
+    assert llm.captured_system is not None, "stream() was never called"
+    sys_prompt = llm.captured_system
+
+    probing_phrases = [
+        "Your reasoning matters here",
+        "before I share what surveys found",
+        "not substantive",
+        "Keep asking",
+    ]
+    assert any(p in sys_prompt for p in probing_phrases), (
+        "Stage 2 system prompt is missing the probing instruction.\n"
+        f"Checked for: {probing_phrases}\n"
+        f"System prompt excerpt: {sys_prompt[:600]}"
+    )
+
+
+def test_system_prompt_rejects_short_evaluative_sentences() -> None:
+    """'That is illegal' is a complete sentence but NOT substantive — it only
+    labels a verdict without explaining why. The Stage 2 system prompt must
+    explicitly call out this category so the LLM doesn't accept it.
+    """
+    llm = _CapturingLLM(observe_json={})
+
+    doc = {
+        "study_id": "sid",
+        "payload": {
+            "stage": "stage_2",
+            "strategy": "misperception_correction",
+            "stage_turn_count": 1,
+            "signals": {"question_answers": {"q1": "2"}},
+        },
+    }
+    messages = [
+        {"role": "assistant", "content": "Question 1 of 8: Would MOST ..."},
+        {"role": "user", "content": "2"},
+        {
+            "role": "assistant",
+            "content": (
+                "Your reasoning matters here — before I share what surveys found, "
+                "could you say a bit about why you picked that?"
+            ),
+        },
+        {"role": "user", "content": "That is illegal"},
+    ]
+
+    _run_process_turn(llm, doc, messages)
+
+    assert llm.captured_system is not None
+    sys_prompt = llm.captured_system
+
+    # The prompt must call out short evaluative sentences as NOT substantive
+    short_sentence_phrases = [
+        "That is illegal",
+        "only label or evaluate",
+        "names a reaction or verdict",
+        "not just names their reaction",
+    ]
+    assert any(p in sys_prompt for p in short_sentence_phrases), (
+        "Stage 2 system prompt does not warn about short evaluative sentences "
+        "('That is illegal' pattern).\n"
+        f"Checked for: {short_sentence_phrases}\n"
+        f"System prompt excerpt: {sys_prompt[:800]}"
+    )
+
+
+def test_system_prompt_probing_language_absent_after_reveal() -> None:
+    """Control: once a survey finding has been revealed and the user acknowledged,
+    OBSERVE increments questions_answered. On the next question, the pipeline must
+    still be in Stage 2 (only 3 of 8 done) — and the system prompt for asking Q4
+    must still include the probing instruction (it's always part of Stage 2).
+    """
+    # OBSERVE records the acknowledgment of q3 reveal
+    existing = {"q1": "2", "q2": "3", "q3": "1"}
+    llm = _CapturingLLM(observe_json={"question_answers": existing})
+
+    doc = {
+        "study_id": "sid",
+        "payload": {
+            "stage": "stage_2",
+            "strategy": "misperception_correction",
+            "stage_turn_count": 3,
+            "signals": {"question_answers": existing},
+        },
+    }
+    messages = [
+        {"role": "assistant", "content": "Surveys found that most said 'probably not'. Question 3 of 8: ..."},
+        {"role": "user", "content": "Makes sense, I expected that"},
+    ]
+
+    _run_process_turn(llm, doc, messages)
+
+    assert llm.captured_system is not None, "stream() was never called"
+    # Stage 2 is still active (3 < 8) so the probing language must still be present
+    assert any(
+        p in llm.captured_system
+        for p in ["Your reasoning matters here", "not substantive", "Keep asking"]
+    ), "Stage 2 system prompt must retain probing language even mid-quiz"
+
+
+# ---------------------------------------------------------------------------
 # Run all tests manually (for quick ad-hoc execution without pytest)
 # ---------------------------------------------------------------------------
 
