@@ -26,6 +26,13 @@ class Settings(BaseSettings):
     )
     enable_think: bool = False  # enable internal reasoning step before each response
 
+    # Safety
+    # Upper bound on how long a participant may stay in the chat interface,
+    # measured from their first message. Once exceeded, the conversation is
+    # force-completed (same closing flow as a normal/safety completion) on
+    # the next turn — the participant is never kicked out, just wrapped up.
+    max_session_minutes: int = 1440  # 24 hours
+
     # Admin
     admin_password: str
 

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 class Message:
     role: str  # "system", "user", "assistant"
     content: str
+    timestamp: str | None = None
 
 
 class LLMProvider(ABC):

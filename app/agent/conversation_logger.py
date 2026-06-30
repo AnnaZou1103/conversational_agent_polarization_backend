@@ -45,16 +45,24 @@ def log_turn(
         # path = Path(conversations_dir)
         # path.mkdir(parents=True, exist_ok=True)
 
+        now_iso = datetime.now(timezone.utc).isoformat()
         entry = {
             "turn": state.turn_count,
             "stage": state.stage.value,
             "stage_turn_count": state.stage_turn_count,
             "strategy": state.strategy,
             "political_party": state.political_party,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": now_iso,
             "system_prompt": system_prompt,
-            "messages": [{"role": m.role, "content": m.content} for m in messages]
-            + [{"role": "assistant", "content": response}],
+            "messages": [
+                {
+                    "role": m.role,
+                    "content": m.content,
+                    "timestamp": m.timestamp or now_iso,
+                }
+                for m in messages
+            ]
+            + [{"role": "assistant", "content": response, "timestamp": now_iso}],
             "signals": dict(state.signals),
         }
 

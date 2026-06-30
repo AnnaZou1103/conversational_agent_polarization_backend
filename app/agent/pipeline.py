@@ -5,6 +5,7 @@ import asyncio
 import json
 import logging
 from collections.abc import AsyncIterator
+from datetime import datetime, timezone
 
 from app.agent.conversation_logger import log_safety_event, log_turn
 from app.agent.phases import StageController
@@ -18,7 +19,9 @@ from app.agent.safety import (
 from app.config import settings
 from app.agent.state import Stage, SessionState, build_session_state
 from app.agent.strategies import get_strategy
+from app.db.user import advance_user_state
 from app.llm.base import LLMProvider, Message
+from app.schema import UserState
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +97,41 @@ def _extract_json_object(text: str) -> str:
     raise ValueError("unbalanced JSON object")
 
 
+def _mark_user_screened(study_id: str) -> None:
+    """Flag the participant as screened (early-terminated) in the `users`
+    collection, on top of the conversation-side verdict, so the frontend's
+    existing screened-out routing shows its conclusion interface instead of
+    the normal post-survey flow. Best-effort — a failure here must not break
+    the chat's own closing flow."""
+    try:
+        advance_user_state(
+            study_id=study_id,
+            next_state=UserState(state="complete", screened=True),
+        )
+    except Exception as e:
+        logger.warning("Failed to mark session %s as screened: %s", study_id, e)
+
+
+def _minutes_since_session_start(messages: list[dict]) -> float | None:
+    """Minutes elapsed since the earliest timestamped message in `messages`.
+
+    Returns None if no message carries a timestamp (e.g. brand-new session).
+    """
+    first_timestamp = next(
+        (m.get("timestamp") for m in messages if m.get("timestamp")), None
+    )
+    if not first_timestamp:
+        return None
+    try:
+        started_at = datetime.fromisoformat(first_timestamp.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if started_at.tzinfo is None:
+        started_at = started_at.replace(tzinfo=timezone.utc)
+    elapsed = datetime.now(timezone.utc) - started_at
+    return elapsed.total_seconds() / 60
+
+
 class AgentPipeline:
     """Core agent pipeline implementing plan-execute-observe loop."""
 
@@ -117,14 +155,20 @@ class AgentPipeline:
         """Analyze user message and update condition-specific signals."""
         prompt_template = OBSERVE_PROMPTS[Strategy(state.strategy)]
 
-        # Deterministically compute the question the agent is currently asking
-        # about, so OBSERVE doesn't have to infer it from prose. Only meaningful
-        # for the misperception_correction strategy; ignored elsewhere. We
-        # derive it from the number of q-keys already captured (self-healing
-        # against any drift in questions_answered), not from questions_answered.
-        answered_keys = state.signals.get("question_answers", {})
-        n_answered = len(answered_keys) if isinstance(answered_keys, dict) else 0
-        current_qid = f"q{n_answered + 1}" if n_answered < 8 else None
+        # Determine which quiz question the agent is currently asking about by
+        # scanning the agent's previous message for the pattern "N of 8"
+        # (e.g. "Question 3 of 8", "number 8 of 8"). This is the most reliable
+        # signal: when the agent is asking a numbered question the pattern is
+        # always present; when asking for reasoning, after a reveal, or in the
+        # stage-3 reflection it is absent. current_qid=None tells OBSERVE to
+        # skip question_answers entirely — preventing reasoning messages or
+        # stale-lag turns from writing to the wrong question slot.
+        current_qid = None
+        if Strategy(state.strategy) == Strategy.MISPERCEPTION_CORRECTION:
+            _m = re.search(r"\b(\d+)\s+of\s+8\b", previous_assistant_message, re.IGNORECASE)
+            if _m:
+                _qnum = int(_m.group(1))
+                current_qid = f"q{_qnum}" if 1 <= _qnum <= 8 else None
 
         prompt = prompt_template.format(
             condition=state.strategy,
@@ -179,12 +223,19 @@ class AgentPipeline:
                 else:
                     state.signals[key] = value
 
-            # For misperception_correction, derive questions_answered from the
-            # set of recorded answers so the stage-transition gate is robust
-            # to LLM drift on the counter itself.
+            # For misperception_correction: strip phantom keys (q9, "None", etc.)
+            # that could appear if OBSERVE misbehaves, then derive
+            # questions_answered from the cleaned answer count so the stage
+            # gate and stage-2 question-selection logic stay in sync.
+            # Phantom writes are now prevented upstream by the regex-based
+            # current_qid (OBSERVE only writes when the agent's previous message
+            # contains "N of 8"), so this is purely a safety-net cleanup.
             if Strategy(state.strategy) == Strategy.MISPERCEPTION_CORRECTION:
                 answers = state.signals.get("question_answers", {})
                 if isinstance(answers, dict):
+                    valid_keys = {f"q{i}" for i in range(1, 9)}
+                    answers = {k: v for k, v in answers.items() if k in valid_keys}
+                    state.signals["question_answers"] = answers
                     state.signals["questions_answered"] = len(answers)
 
             state.metadata["last_observation"] = extracted
@@ -318,9 +369,46 @@ class AgentPipeline:
             if user_message and previous_assistant_message:
                 break
 
+        # --- SESSION TIME LIMIT ---
+        # Upper bound on how long a participant may stay in the chat, measured
+        # from their first message. The participant is never kicked out — the
+        # conversation is force-completed below (same closing flow as a normal
+        # completion) so the survey button appears, and the event is recorded
+        # via the verdict sidecar as an early termination for analysis.
+        elapsed_minutes = _minutes_since_session_start(messages)
+        time_limit_reached = (
+            elapsed_minutes is not None
+            and settings.max_session_minutes > 0
+            and elapsed_minutes >= settings.max_session_minutes
+        )
+
+        if time_limit_reached:
+            state.stage = Stage.COMPLETE
+            state.stage_turn_count = 0
+            verdict = SafetyVerdict(
+                action="terminate",
+                category="time_limit",
+                reason=(
+                    f"session exceeded max_session_minutes "
+                    f"({settings.max_session_minutes})"
+                ),
+                user_message_excerpt=user_message[:200],
+            )
+            state.safety_history.append(verdict.to_dict())
+            log_safety_event(settings.conversations_dir, state, verdict)
+            _mark_user_screened(state.study_id)
+            logger.info(
+                "Session %s hit the %d-minute time limit after %.1f minutes; "
+                "closing out",
+                state.study_id,
+                settings.max_session_minutes,
+                elapsed_minutes,
+            )
+
         # --- SAFETY MONITOR ---
-        # Skip the gate when there is no user message yet (agent-initiated open).
-        if user_message:
+        # Skip the gate when there is no user message yet (agent-initiated open),
+        # and skip entirely once the time limit has force-completed the session.
+        if user_message and not time_limit_reached:
             verdict = self._safety_check(state, user_message)
 
             if verdict.action == "reminder":
@@ -350,6 +438,7 @@ class AgentPipeline:
                 state.safety_history.append(verdict.to_dict())
                 state.previous_user_message = user_message
                 log_safety_event(settings.conversations_dir, state, verdict)
+                _mark_user_screened(state.study_id)
                 logger.info(
                     "Safety termination for session %s: %s",
                     state.study_id,
@@ -387,7 +476,9 @@ class AgentPipeline:
         # do NOT await it, letting it overlap with EXECUTE below (awaited before
         # logging), which keeps its ~1.3s off time-to-first-token.
         deferred_observe_task = None
-        if state.turn_count >= 1:
+        if time_limit_reached:
+            stage = Stage.COMPLETE
+        elif state.turn_count >= 1:
             if state.strategy in _OBSERVE_OFF_CRITICAL_PATH:
                 deferred_observe_task = asyncio.create_task(
                     self._observe(state, user_message, previous_assistant_message)
@@ -440,7 +531,11 @@ class AgentPipeline:
 
         # --- EXECUTE ---
         llm_messages = [
-            Message(role=msg["role"], content=msg["content"])
+            Message(
+                role=msg["role"],
+                content=msg["content"],
+                timestamp=msg.get("timestamp"),
+            )
             for msg in messages
             if msg["role"] in ("user", "assistant")
         ]

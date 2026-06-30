@@ -123,8 +123,8 @@ def test_misperception_quiz_gate() -> None:
     s = _evaluate("misperception_correction", Stage.STAGE_3, 1,
                   {"reflection_shared": True})
     assert s.stage == Stage.STAGE_4
-    # Safety net: advances after 2 turns even without the signal (user gave
-    # terse/dismissive responses like "Nothing" that OBSERVE might miss).
+
+    # Safety net: n>=2 advances even without reflection_shared (catches "Nothing"/"Okay")
     s = _evaluate("misperception_correction", Stage.STAGE_3, 2, {})
     assert s.stage == Stage.STAGE_4
 
@@ -202,6 +202,7 @@ class _ObserveLLM(LLMProvider):
     async def complete(self, messages, system=None, temperature=0.7,
                        max_tokens=2048) -> str:
         # Only OBSERVE calls complete now (no LLM stage eval). Report q1..q8.
+        # questions_answered is self-healed to len(question_answers) after merge.
         return json.dumps({"question_answers": {f"q{i}": "1" for i in range(1, 9)}})
 
     async def stream(self, messages, system=None, temperature=0.7,

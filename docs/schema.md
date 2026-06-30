@@ -43,6 +43,12 @@ not_started → pre_survey → to_intervention → intervention → to_post_surv
 ```
 Transitions are driven by the frontend via `POST /user/advance/{study_id}`.
 
+The agent pipeline also writes directly to this document (bypassing the
+endpoint) when a session is force-completed by the [time limit](#conversations-collection):
+`state` is set to `complete` and `screened` to `true`, so the frontend's
+existing screened-out routing shows its conclusion interface instead of the
+normal post-survey flow.
+
 **Conditions (`strategy`):**
 `common_identity`, `personal_narrative`, `misperception_correction`, `control`, `control_politics`
 
@@ -64,10 +70,10 @@ One document per participant. Created on the first chat turn. Unique index on `s
     "timestamp": "2024-01-01T00:05:00Z",
     "system_prompt": "You are a conversational agent...",
     "messages": [
-      { "role": "user", "content": "I really dislike Republicans." },
-      { "role": "assistant", "content": "I hear you. What shapes that feeling?" },
-      { "role": "user", "content": "The news mostly." },
-      { "role": "assistant", "content": "How much of your sense of what they're like comes from there?" }
+      { "role": "user", "content": "I really dislike Republicans.", "timestamp": "2024-01-01T00:04:50Z" },
+      { "role": "assistant", "content": "I hear you. What shapes that feeling?", "timestamp": "2024-01-01T00:04:52Z" },
+      { "role": "user", "content": "The news mostly.", "timestamp": "2024-01-01T00:05:00Z" },
+      { "role": "assistant", "content": "How much of your sense of what they're like comes from there?", "timestamp": "2024-01-01T00:05:00Z" }
     ],
     "signals": {
       "feeling_expressed": true,
@@ -104,7 +110,7 @@ One document per participant. Created on the first chat turn. Unique index on `s
 | `political_party` | string \| null | `republican` or `democrat` |
 | `timestamp` | string | ISO 8601 timestamp of this turn |
 | `system_prompt` | string | Full system prompt sent to the LLM for this turn |
-| `messages` | array | Full conversation history including the assistant reply just generated |
+| `messages` | array | Full conversation history including the assistant reply just generated; each entry has `role`, `content`, and `timestamp` (ISO 8601, when that message was sent/generated) |
 | `signals` | object | Accumulated condition-specific signals (see below) |
 
 `payload` is fully overwritten on every turn — it always reflects the latest state.
@@ -116,13 +122,17 @@ Only present if a safety event has occurred. Overwritten on each new safety even
 | Field | Type | Description |
 |---|---|---|
 | `action` | string | `reminder` or `terminate` |
-| `category` | string | `gibberish`, `indecent`, `both` |
+| `category` | string | `gibberish`, `indecent`, `both`, `time_limit` |
 | `reason` | string | Human-readable reason |
 | `user_message_excerpt` | string | First 200 chars of the offending message |
 | `consecutive_reminders` | int | Streak count at time of event |
 | `indecent_count` | int | Lifetime indecent event count |
 | `invalid_count` | int | Lifetime gibberish event count |
 | `timestamp` | string | ISO 8601 |
+
+`category: "time_limit"` marks an early termination caused by the session exceeding `max_session_minutes` (config, default 1440 = 24h), measured from the participant's first message timestamp. Unlike gibberish/indecent terminations, the participant is not shown an abrupt termination message — the conversation is force-completed through the normal closing flow (`payload.stage` becomes `"complete"`) so the LLM still generates a warm closing reply.
+
+Both this and the consecutive-reminder safety termination (`action: "terminate"`, category `gibberish`/`indecent`/`both`) also update the participant's `users` document to `state: "complete"`, `screened: true` (see [users collection](#users-collection)), so the frontend routes them to its screened-out conclusion interface rather than the normal post-survey flow. This `users` write is best-effort and separate from the `verdict`/`payload` writes above — a failure to flag `screened` does not block or alter the conversation's own closing message.
 
 ---
 

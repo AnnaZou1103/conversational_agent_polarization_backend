@@ -758,7 +758,7 @@ def is_exact_repeat(msg: str, previous: str | None) -> bool:
 # ---------------------------------------------------------------------------
 
 Action = Literal["clean", "reminder", "terminate"]
-Category = Literal["gibberish", "indecent", "both", "clean"]
+Category = Literal["gibberish", "indecent", "both", "clean", "time_limit"]
 
 
 @dataclass

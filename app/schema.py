@@ -96,6 +96,7 @@ class ChatResponse(CaseModel):
 class Message(CaseModel):
     role: Literal["user", "assistant"]
     content: str
+    timestamp: Optional[str] = None
 
 
 class ChatMessage(CaseModel):

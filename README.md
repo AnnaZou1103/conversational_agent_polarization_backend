@@ -75,8 +75,8 @@ Returns the full message history for a participant.
 **Response**
 ```json
 [
-  { "role": "user", "content": "I really dislike Republicans." },
-  { "role": "assistant", "content": "I hear you. Can you tell me more about what shapes that feeling?" }
+  { "role": "user", "content": "I really dislike Republicans.", "timestamp": "2024-01-01T00:04:50Z" },
+  { "role": "assistant", "content": "I hear you. Can you tell me more about what shapes that feeling?", "timestamp": "2024-01-01T00:04:52Z" }
 ]
 ```
 

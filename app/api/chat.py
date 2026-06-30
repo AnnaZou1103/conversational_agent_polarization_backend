@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import time
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -73,7 +74,7 @@ _UTILITY_PHRASES = (
 def _get_history(study_id: str) -> list[dict]:
     """Build effective chat context: persisted history + current request message."""
     history = [
-        {"role": m.role, "content": m.content}
+        {"role": m.role, "content": m.content, "timestamp": m.timestamp}
         for m in get_chat_history(study_id=study_id)
     ]
     return history
@@ -115,7 +116,13 @@ async def chat_completions(request: ChatCompletionRequest):
     incoming_text = request.message.text_content()
     # Frontend may send an empty user message to trigger greeting; do not persist it.
     if incoming_text.strip():
-        messages.append({"role": request.message.role, "content": incoming_text})
+        messages.append(
+            {
+                "role": request.message.role,
+                "content": incoming_text,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
     completion_id = f"chatcmpl-{uuid.uuid4().hex[:12]}"
 
     if _is_utility_request(messages):

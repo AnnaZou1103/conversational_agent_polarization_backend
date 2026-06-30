@@ -61,7 +61,9 @@ def _coerce_messages(messages: list | None) -> list[Message]:
         role = msg.get("role")
         content = msg.get("content")
         if role in {"user", "assistant"} and isinstance(content, str):
-            history.append(Message(role=role, content=content))
+            history.append(
+                Message(role=role, content=content, timestamp=msg.get("timestamp"))
+            )
 
     return history
 
