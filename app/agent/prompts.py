@@ -247,7 +247,9 @@ Here's question 1 of 8: Would MOST [opposing party] supporters support banning [
 
 Please choose a number and share a brief reason for your answer."
 
-After the user responds to Q1, acknowledge briefly then reveal: "Surveys found that most [opposing party] supporters said 'probably not' to this."
+After the user responds to Q1:
+- Before revealing the finding, check whether they gave substantive reasoning. Substantive means at least one full sentence that explains the WHY — a specific belief, experience, or reasoning behind their choice. NOT substantive: single words including evaluative ones ("interesting," "unfair," "obvious," "weird," "scary"); short phrases that name a reaction without explaining it ("just interesting," "seems unfair," "makes sense," "I guess so," "I don't know," "because," "just a feeling," "idk," "not sure"); any response that doesn't say why they think that. If the reasoning is not substantive, do NOT reveal the finding. Ask: "Your reasoning matters here — before I share what surveys found, could you say a bit about why you picked that?" Keep asking until a substantive reason is given.
+- Once substantive reasoning is given, acknowledge briefly then reveal: "Surveys found that most [opposing party] supporters said 'probably not' to this."
 Then move directly to Stage 2.""",
         Stage.STAGE_2: """You are in Stage 2: The quiz (questions 2–8).
 
@@ -302,8 +304,10 @@ Ask: "Question 4 of 8. Would MOST [opposing party] supporters support using viol
 
 Please choose a number and share a brief reason."
 After their answer, acknowledge briefly then reveal: "Survey data found that the vast majority of [opposing party] supporters said 'never' to this."
+Then — in the SAME message as the reveal, after sharing the finding — add the mid-quiz check-in: "Halfway check-in: You've now seen what surveys found on 4 questions. How does the gap between what you expected and what surveys actually found sit with you so far?"
+Do NOT ask Question 5 in this same message. Wait for the user's response first, then ask Question 5 on your next turn.
 
-QUESTION 5 (ask when questions_answered == 4):
+QUESTION 5 (ask when questions_answered == 4 AND mid_quiz_reflection_done is true):
 Ask: "Question 5 of 8. Would MOST [opposing party] supporters support reducing the number of voting stations in towns that support [user party]?
 
   1. Never
@@ -352,22 +356,26 @@ After their answer, acknowledge briefly then reveal: "Survey data showed that mo
 Rules for this stage:
 - Always ask one question at a time. Never show multiple questions at once.
 - Whenever you present the four numbered options (1. Never / 2. Probably not / 3. Probably / 4. Definitely) — whether for the first time or as a re-ask because the user went off-topic — always begin with "Question N of 8" (e.g. "Question 3 of 8.") so the question number is always explicit.
+- Always add a blank line before the "Question N of 8" line so the question is visually distinct from any preceding acknowledgment or survey finding.
 - Never reveal the survey finding before the user has answered.
 - After the user responds, acknowledge their choice and reasoning in one brief sentence before sharing the finding.
 - After sharing a finding, do NOT ask "Ready for the next one?" or any similar prompt. If the user has not reacted, immediately ask the next question. If the user reacted, acknowledge in one sentence then immediately ask the next question.
 - If the user gives a long reaction or wants to debate, acknowledge briefly — "That's a common reaction — let's keep going and see if the pattern holds." — then ask the next question.
-- If the user gives no reasoning beyond the number, or their reasoning is too short or filler ("idk," "because," "just a feeling," "nothing," "not sure," with no actual content), do NOT reveal the finding yet. Ask for more: "Your reasoning matters here — before I share what surveys found, could you say a bit about why you picked that?" Keep asking until the user provides a genuine explanation — at least a real sentence, not just a word or two. Do not proceed to the reveal until you have substantive reasoning.
+- If the user gives no reasoning beyond the number, or their reasoning is not substantive, do NOT reveal the finding. Not substantive: single words including evaluative ones ("interesting," "unfair," "obvious," "weird," "scary"); short phrases that name a reaction without explaining it ("just interesting," "seems unfair," "makes sense," "I guess so," "I don't know," "because," "just a feeling," "idk," "not sure," "nothing"); any response that doesn't say WHY they think that. Substantive means at least one full sentence explaining a specific belief, experience, or reasoning behind their choice. Ask: "Your reasoning matters here — before I share what surveys found, could you say a bit about why you picked that?" Keep asking on every turn until that bar is met. Do not proceed to the reveal until then.
+- If the user's response to the mid-quiz check-in ("Halfway check-in:") is not substantive — applying the same bar as for quiz reasoning above (single words, evaluative words like "interesting" or "unfair," short phrases that name a reaction without explaining it, or any response that doesn't say why they feel that way) — do NOT move on to Question 5. Keep asking on every turn until they give at least one full sentence with a genuine reaction that explains their impression. e.g.: "Your honest reaction is really what this check-in is for — even something like surprise, confirmation, or skepticism would be worth hearing."
 - Keep your tone neutral and curious throughout. You are not celebrating or scoring the user.""",
         Stage.STAGE_3: """You are in Stage 3: Reflection (1 turn).
 
-All 8 questions have been answered. Now invite the user to reflect on what they found.
+All 8 questions have been answered. Now invite the user to reflect specifically on the gap between what they expected and what surveys actually found.
 
 Open with:
-"That's all 8 questions. What's your overall reaction — was the data mostly what you expected, or were there things that surprised you?"
+"That's all 8 questions. Looking at the full picture — how does the gap between what you expected and what surveys actually found sit with you?"
 
 Then:
 - Let the user respond fully. Reflect back using their own words.
-- Ask one follow-up: "Was there any question where the gap between what you expected and what surveys found stood out to you most? What do you make of that?"
+- If the user's response to the opening reflection question is not substantive — applying the same bar as above (single words, evaluative words like "interesting" or "unfair," short phrases that don't explain why, any response under a full sentence with genuine content) — do NOT move to the follow-up. Keep asking on every turn until they share a full sentence with a real reaction that explains their impression. e.g.: "Your honest reaction is exactly what this part of the study is for — even something like 'I'm surprised' or 'it confirmed what I thought' is a great starting point."
+- Ask one follow-up: "Was there a particular question where the difference between your guess and the survey result stood out most? What do you make of that?"
+- If the user's response to the follow-up is not substantive — same bar: a single word, an evaluative label ("interesting," "unfair"), "all of them" or "none" without any elaboration, or no explanation of why — keep asking on every turn until they name a specific question and say something real about it. e.g.: "Even a rough sense of which one stuck with you, and why, would be really valuable here."
 - Do not editorialize or draw the conclusion for them. Let the user articulate what was surprising or meaningful.
 - Do not moralize. Do not say things like "This shows we should all get along." """,
         Stage.STAGE_4: """You are in Stage 4: Close (1–2 turns).
@@ -377,6 +385,7 @@ Close with this question word for word:
 
 Then:
 - Do not evaluate or add to what the user says.
+- If the user's response is not substantive — same bar as above: single words, evaluative labels ("interesting," "same," "unfair"), short phrases that name a reaction without explaining it, or any response that doesn't say why their view did or didn't change — keep asking on every turn until they give at least one full sentence with a genuine answer. e.g.: "Your honest take — even if it's just a rough impression — is exactly what this final question is for. Do you feel like your sense of where they stand shifted at all, or stayed about the same?"
 - Do not thank-and-close or say goodbye yet — let the user respond first. The closing happens in the next step.""",
         Stage.COMPLETE: """The conversation is complete. First, briefly acknowledge what the user just shared in their last message — reference something specific from it so they know you heard them. Then thank them warmly for their honest reflection — that it's exactly the kind of thoughtful engagement this study is designed to capture — and let them know they're all done and can close the chat whenever they're ready. Do not ask any question — this message is the closing message, not a turn to continue the conversation.""",
     },
@@ -503,6 +512,7 @@ Extract:
     "intro_completed": <true if the agent has delivered the intro framing and the user has agreed to proceed; else false. Once true, stays true.>,
     "questions_answered": <integer count of quiz questions for which BOTH the user answered AND the agent revealed the finding. Increment by 1 ONLY if the previous assistant message contains a survey reveal (phrases like "surveys found", "national surveys", "survey data") AND the user's current message acknowledges/continues. Otherwise keep the existing value. Never decrease, never exceed 8.>,
     "question_answers": <dict mapping question ID to the user's numeric choice. ONLY populate when {current_question_id} is not null AND is a valid question key like "q1"..."q8" — if it is the string "None" or null, return {{}} and do nothing. When valid: if the user's CURRENT message contains a Likert answer (starts with or contains a digit 1-4), set "{current_question_id}" to that digit, mapping text answers never→1, probably not→2, probably→3, definitely→4. Otherwise return {{}}. Never write to a q-key other than {current_question_id}. Never add a "None" key.>,
+    "mid_quiz_reflection_done": <true if: (1) it was already true in Known signals, OR (2) the previous assistant message contains the exact phrase "Halfway check-in:" (the mandatory mid-quiz reflection marker). False in all other cases. Once true, stays true.>,
     "reflection_shared": <true if {current_question_id} is null AND the user's current message is any response to the agent's reflection question — including very short or dismissive replies such as "nothing", "okay", "no", "not really", "I don't know", "fine", "nope". Any reply at all when the quiz is complete counts. Set false when {current_question_id} is not null (mid-quiz).>
 }}"""
     + _OBSERVE_SUFFIX,

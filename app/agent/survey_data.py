@@ -44,36 +44,36 @@ QUIZ_QUESTIONS: list[dict] = [
     {
         "id": "q2",
         "label": "Prosecuting journalists who accuse opposing-party politicians of misconduct",
-        "survey_average": "Most {party} supporters would probably support this action.",
+        "survey_average": "Most {party} supporters would never support this action.",
     },
     {
         "id": "q3",
         "label": "Reinterpreting the Constitution to block the other party's policies",
-        "survey_average": "Most {party} supporters would probably support this action.",
+        "survey_average": "Most {party} supporters would never support this action.",
     },
     {
         "id": "q4",
         "label": "Using violence to block major laws passed by the other party",
-        "survey_average": "Most {party} supporters would probably support this action.",
+        "survey_average": "Most {party} supporters would never support this action.",
     },
     {
         "id": "q5",
         "label": "Reducing voting stations in areas that lean toward the other party",
-        "survey_average": "Most {party} supporters would probably support this action.",
+        "survey_average": "Most {party} supporters would never support this action.",
     },
     {
         "id": "q6",
         "label": "Ignoring court rulings issued by the other party's judges",
-        "survey_average": "Most {party} supporters would probably support this action.",
+        "survey_average": "Most {party} supporters would probably not support this action.",
     },
     {
         "id": "q7",
         "label": "Not accepting the results of a presidential election they lost",
-        "survey_average": "Most {party} supporters would probably support this action.",
+        "survey_average": "Most {party} supporters would never support this action.",
     },
     {
         "id": "q8",
         "label": "Laws making it easier for their party (and harder for the other party) to win elections",
-        "survey_average": "Most {party} supporters would probably support this action.",
+        "survey_average": "Most {party} supporters would never support this action.",
     },
 ]
