@@ -60,8 +60,8 @@ _TRANSITIONS: dict[str, list[tuple[Stage, Stage, Predicate]]] = {
         (Stage.STAGE_2, Stage.STAGE_3,
          lambda s, n: s.get("questions_answered", 0) >= 8),
         (Stage.STAGE_3, Stage.STAGE_4,
-         lambda s, n: bool(s.get("reflection_shared")) or n >= 2),
-        (Stage.STAGE_4, Stage.COMPLETE, lambda s, n: n >= 1),
+         lambda s, n: bool(s.get("reflection_shared")) or n >= 4),
+        (Stage.STAGE_4, Stage.COMPLETE, lambda s, n: n >= 2),
     ],
     # Content-driven: wait for the user to signal they're winding down (OBSERVE
     # re-evaluates `winding_down` fresh every turn off the user's latest message
