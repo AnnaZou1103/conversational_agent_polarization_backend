@@ -56,19 +56,19 @@ def _evaluate(strategy: str, stage: Stage, turn: int, signals: dict) -> SessionS
 # ---------------------------------------------------------------------------
 
 def test_common_identity_full_path() -> None:
-    s = _evaluate("common_identity", Stage.STAGE_1, 1, {"feeling_expressed": True})
+    s = _evaluate("common_identity", Stage.STAGE_1, 2, {"feeling_expressed": True})
     assert s.stage == Stage.STAGE_2
     assert s.stage_turn_count == 0  # reset on transition
 
-    s = _evaluate("common_identity", Stage.STAGE_2, 2,
+    s = _evaluate("common_identity", Stage.STAGE_2, 3,
                   {"media_distortion_acknowledged": True})
     assert s.stage == Stage.STAGE_3
 
-    s = _evaluate("common_identity", Stage.STAGE_3, 1,
+    s = _evaluate("common_identity", Stage.STAGE_3, 2,
                   {"common_identity_described": True})
     assert s.stage == Stage.STAGE_4
 
-    s = _evaluate("common_identity", Stage.STAGE_4, 1, {})
+    s = _evaluate("common_identity", Stage.STAGE_4, 2, {})
     assert s.stage == Stage.COMPLETE
 
 
@@ -80,38 +80,38 @@ def test_common_identity_blocks_without_signal() -> None:
 
 
 def test_common_identity_blocks_without_turns() -> None:
-    # Signal present but turn threshold (>= 2) not met.
+    # Signal present but turn threshold (>= 3) not met.
     s = _evaluate("common_identity", Stage.STAGE_2, 1,
                   {"media_distortion_acknowledged": True})
     assert s.stage == Stage.STAGE_2
 
 
 def test_personal_narrative_uses_person_label_not_person_name() -> None:
-    # person_label present -> advances.
-    s = _evaluate("personal_narrative", Stage.STAGE_1, 1, {"person_label": "my uncle"})
+    # person_label present at/above floor (n>=2) -> advances.
+    s = _evaluate("personal_narrative", Stage.STAGE_1, 2, {"person_label": "my uncle"})
     assert s.stage == Stage.STAGE_2
 
     # The legacy `person_name` key must NOT trigger anything — it never exists in
     # real signals (OBSERVE emits person_label). This is the masked bug the LLM
     # gate used to paper over.
-    s = _evaluate("personal_narrative", Stage.STAGE_1, 1, {"person_name": "my uncle"})
+    s = _evaluate("personal_narrative", Stage.STAGE_1, 2, {"person_name": "my uncle"})
     assert s.stage == Stage.STAGE_1
 
 
 def test_personal_narrative_details_and_origins() -> None:
-    s = _evaluate("personal_narrative", Stage.STAGE_2, 2, {"person_details_count": 2})
+    s = _evaluate("personal_narrative", Stage.STAGE_2, 3, {"person_details_count": 2})
     assert s.stage == Stage.STAGE_3
 
-    s = _evaluate("personal_narrative", Stage.STAGE_2, 2, {"person_details_count": 1})
-    assert s.stage == Stage.STAGE_2  # below threshold
+    s = _evaluate("personal_narrative", Stage.STAGE_2, 3, {"person_details_count": 1})
+    assert s.stage == Stage.STAGE_2  # below detail threshold
 
-    s = _evaluate("personal_narrative", Stage.STAGE_3, 1, {"origins_explored": True})
+    s = _evaluate("personal_narrative", Stage.STAGE_3, 2, {"origins_explored": True})
     assert s.stage == Stage.STAGE_4
 
 
 def test_personal_narrative_s4_generalization() -> None:
-    # Signal fires -> advance immediately even on turn 1.
-    s = _evaluate("personal_narrative", Stage.STAGE_4, 1, {"generalization_reflected": True})
+    # Signal fires at/above floor (n>=2) -> advance.
+    s = _evaluate("personal_narrative", Stage.STAGE_4, 2, {"generalization_reflected": True})
     assert s.stage == Stage.COMPLETE
 
     # No signal AND below safety-net cap (n=5 < 6) -> stay.
@@ -146,15 +146,18 @@ def test_control_skips_to_stage_4() -> None:
         # Still talking (no winding_down signal, under the turn cap) -> stays put.
         s = _evaluate(strategy, Stage.STAGE_1, 3, {})
         assert s.stage == Stage.STAGE_1, strategy
-        # winding_down but under the floor (n=1) -> stays put, don't cut it short.
-        s = _evaluate(strategy, Stage.STAGE_1, 1, {"winding_down": True})
+        # winding_down but under the depth floor (n=7 < 8) -> stays put.
+        s = _evaluate(strategy, Stage.STAGE_1, 7, {"winding_down": True})
         assert s.stage == Stage.STAGE_1, strategy
-        # winding_down and past the floor -> advances (skips 2 and 3 legitimately).
-        s = _evaluate(strategy, Stage.STAGE_1, 2, {"winding_down": True})
+        # winding_down and at/past the depth floor (n=8) -> advances.
+        s = _evaluate(strategy, Stage.STAGE_1, 8, {"winding_down": True})
         assert s.stage == Stage.STAGE_4, strategy
-        # Turn-count safety net fires even without the signal.
-        s = _evaluate(strategy, Stage.STAGE_1, 5, {})
+        # Turn-count safety net fires at n=12 even without the signal.
+        s = _evaluate(strategy, Stage.STAGE_1, 12, {})
         assert s.stage == Stage.STAGE_4, strategy
+        # Below safety net cap without signal -> stays put.
+        s = _evaluate(strategy, Stage.STAGE_1, 11, {})
+        assert s.stage == Stage.STAGE_1, strategy
         # In Stage 4, still has more to add -> stays put.
         s = _evaluate(strategy, Stage.STAGE_4, 1, {"winding_down": False})
         assert s.stage == Stage.STAGE_4, strategy
@@ -195,7 +198,7 @@ def test_no_llm_is_called() -> None:
     controller = StageController(llm=None)
     controller.llm = MagicMock(complete=sentinel)
     state = SessionState(study_id="t", strategy="common_identity",
-                         stage=Stage.STAGE_1, stage_turn_count=1,
+                         stage=Stage.STAGE_1, stage_turn_count=2,
                          signals={"feeling_expressed": True})
     asyncio.run(controller.evaluate_transition(state, "msg"))
     assert state.stage == Stage.STAGE_2
@@ -377,12 +380,12 @@ def test_common_identity_always_completes_without_signals() -> None:
 
 
 def test_common_identity_signal_still_advances_before_cap() -> None:
-    # Signals should advance earlier than the cap (not blocked by safety net logic)
-    s = _evaluate("common_identity", Stage.STAGE_1, 1, {"feeling_expressed": True})
+    # Signals should advance at/above their floor, well before the cap
+    s = _evaluate("common_identity", Stage.STAGE_1, 2, {"feeling_expressed": True})
     assert s.stage == Stage.STAGE_2
-    s = _evaluate("common_identity", Stage.STAGE_2, 2, {"media_distortion_acknowledged": True})
+    s = _evaluate("common_identity", Stage.STAGE_2, 3, {"media_distortion_acknowledged": True})
     assert s.stage == Stage.STAGE_3
-    s = _evaluate("common_identity", Stage.STAGE_3, 1, {"common_identity_described": True})
+    s = _evaluate("common_identity", Stage.STAGE_3, 2, {"common_identity_described": True})
     assert s.stage == Stage.STAGE_4
 
 
@@ -409,8 +412,8 @@ def test_personal_narrative_always_completes_without_signals() -> None:
 
 
 def test_personal_narrative_s4_signal_still_wins_before_cap() -> None:
-    # generalization_reflected should still advance immediately
-    s = _evaluate("personal_narrative", Stage.STAGE_4, 1, {"generalization_reflected": True})
+    # generalization_reflected advances at/above floor (n>=2), before the cap (n>=6)
+    s = _evaluate("personal_narrative", Stage.STAGE_4, 2, {"generalization_reflected": True})
     assert s.stage == Stage.COMPLETE
 
 
@@ -430,9 +433,9 @@ def test_misperception_always_completes_without_signals() -> None:
     assert final == Stage.COMPLETE, f"misperception_correction stuck at {final} with no signals"
 
 
-def test_control_conditions_already_have_safety_nets() -> None:
+def test_control_conditions_always_complete_without_signals() -> None:
     for strategy in ("control", "control_politics"):
-        final = _advance_no_signal(strategy, Stage.STAGE_1, 10)
+        final = _advance_no_signal(strategy, Stage.STAGE_1, 20)
         assert final == Stage.COMPLETE, f"{strategy} stuck at {final} with no signals"
 
 

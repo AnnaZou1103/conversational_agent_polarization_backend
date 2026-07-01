@@ -842,3 +842,213 @@ class TestUserAbortSignal:
             f"COMPLETE response does not contain farewell: {resp}"
         )
         assert "?" not in resp, f"COMPLETE response asked a question: {resp}"
+
+
+# ===========================================================================
+# GATE 11: control/control_politics S1 — follow-up depth
+# Agent must probe deeper into what participant already raised,
+# NOT redirect to a second topic or wrap up early.
+# ===========================================================================
+
+def _asks_for_new_topic(response: str) -> bool:
+    """True if the response redirects to a second/different topic."""
+    redirects = [
+        "anything else", "something else", "other things", "other topics",
+        "what else", "else on your mind", "anything other", "another thing",
+    ]
+    lower = response.lower()
+    return any(r in lower for r in redirects)
+
+
+def _asks_about_same_topic(response: str, topic_keywords: list[str]) -> bool:
+    """True if the follow-up question references keywords from the first topic."""
+    lower = response.lower()
+    return any(kw in lower for kw in topic_keywords) and "?" in response
+
+
+class TestControlFollowUpDepth:
+    """After participant shares one real topic, agent must probe deeper into it —
+    not ask for a second topic or wrap up early."""
+
+    OPENING = (
+        "Welcome, and thanks for taking the time to chat with me today. "
+        "This is just a brief, informal check-in conversation about how you've "
+        "been doing lately. I'd like to start by checking in — how have you been "
+        "doing lately? Is there anything that's been weighing on you or on your mind?"
+    )
+
+    def test_dives_deeper_not_redirects(self) -> None:
+        """After 'work has been stressful', agent asks about work — not 'anything else?'"""
+        llm = _make_llm()
+        system = _system("control", Stage.STAGE_1, turn=2)
+        msgs = [
+            {"role": "assistant", "content": self.OPENING},
+            {"role": "user", "content": "Work has been pretty stressful lately."},
+            {"role": "assistant", "content": "That sounds like a lot. What's been making it stressful?"},
+            {"role": "user", "content": "My manager keeps changing what we're supposed to be working on."},
+        ]
+        resp = asyncio.run(_respond(llm, system, msgs))
+        print(f"\n[CTRL depth test]\n{resp}")
+        # Must probe further
+        assert _probes(resp), f"Agent stopped probing after thin follow-up.\n{resp}"
+        # Must NOT redirect to a new topic at turn 2
+        assert not _asks_for_new_topic(resp), (
+            f"Agent asked for a second topic instead of going deeper.\n{resp}"
+        )
+
+    def test_stays_on_topic_through_multiple_turns(self) -> None:
+        """3-turn exchange about work stress — agent stays on work, not redirects."""
+        llm = _make_llm()
+        system = _system("control", Stage.STAGE_1, turn=3)
+        msgs = [
+            {"role": "assistant", "content": self.OPENING},
+            {"role": "user", "content": "Work has been pretty stressful lately."},
+            {"role": "assistant", "content": "What's been making it stressful?"},
+            {"role": "user", "content": "My manager keeps changing priorities."},
+            {"role": "assistant", "content": "How long has that been going on?"},
+            {"role": "user", "content": "About two months now. It's exhausting."},
+        ]
+        resp = asyncio.run(_respond(llm, system, msgs))
+        print(f"\n[CTRL multi-turn depth]\n{resp}")
+        assert _probes(resp), f"Agent stopped probing mid-depth.\n{resp}"
+        # Should ask about the exhaustion or the situation — not a new topic
+        assert not _asks_for_new_topic(resp), (
+            f"Agent redirected to a new topic instead of continuing.\n{resp}"
+        )
+
+    def test_does_not_close_early_on_winding_down(self) -> None:
+        """'That's about it' at turn 2 — agent must keep conversation open (below n=8 floor)."""
+        llm = _make_llm()
+        system = _system("control", Stage.STAGE_1, turn=2)
+        msgs = [
+            {"role": "assistant", "content": self.OPENING},
+            {"role": "user", "content": "Work has been stressful."},
+            {"role": "assistant", "content": "What's been making it stressful?"},
+            {"role": "user", "content": "That's about it, nothing else really."},
+        ]
+        resp = asyncio.run(_respond(llm, system, msgs))
+        print(f"\n[CTRL no early close turn=2]\n{resp}")
+        # Agent should keep probing — not wrap up after 2 turns
+        assert _probes(resp), f"Agent wrapped up too early at turn 2.\n{resp}"
+        assert "thank" not in resp.lower()[:60], (
+            f"Agent started closing after only 2 turns.\n{resp}"
+        )
+
+    def test_does_not_close_at_turn_7(self) -> None:
+        """'I think that's all' at turn 7 — still one below the n=8 floor, must keep probing."""
+        llm = _make_llm()
+        system = _system("control", Stage.STAGE_1, turn=7)
+        msgs = [
+            {"role": "assistant", "content": self.OPENING},
+            {"role": "user", "content": "Work has been really stressful."},
+            {"role": "assistant", "content": "What's been making it stressful?"},
+            {"role": "user", "content": "My manager keeps changing priorities."},
+            {"role": "assistant", "content": "How long has that been going on?"},
+            {"role": "user", "content": "About two months. It's affecting my sleep."},
+            {"role": "assistant", "content": "Has it been hard to disconnect at home?"},
+            {"role": "user", "content": "Yeah, I keep checking my phone at dinner."},
+            {"role": "assistant", "content": "That sounds like it's bleeding into your home life. Have you been able to talk to your manager about it?"},
+            {"role": "user", "content": "Not really. I think that's all I've got."},
+            {"role": "assistant", "content": "I hear you. One thing I'm curious about — when you say it's affecting your sleep, what does that look like?"},
+            {"role": "user", "content": "I just can't stop thinking about work at night. Anyway, I think I'm done."},
+        ]
+        resp = asyncio.run(_respond(llm, system, msgs))
+        print(f"\n[CTRL no early close turn=7]\n{resp}")
+        # Turn 7 is still below the n=8 floor — agent must not close yet
+        assert _probes(resp), f"Agent wrapped up at turn 7 (below n=8 floor).\n{resp}"
+        assert "thank" not in resp.lower()[:60], (
+            f"Agent started closing at turn 7, before the n=8 floor.\n{resp}"
+        )
+
+    def test_natural_wrap_after_depth(self) -> None:
+        """After 8+ turns of genuine content, participant signals done — agent wraps naturally."""
+        llm = _make_llm()
+        system = _system("control", Stage.STAGE_1, turn=8)
+        msgs = [
+            {"role": "assistant", "content": self.OPENING},
+            {"role": "user", "content": "Work has been really stressful — my manager keeps changing priorities."},
+            {"role": "assistant", "content": "How long has that been going on?"},
+            {"role": "user", "content": "About two months. It's affecting my sleep."},
+            {"role": "assistant", "content": "That sounds draining. Has it been hard to disconnect when you're at home?"},
+            {"role": "user", "content": "Yeah, I keep checking my phone even at dinner. My partner is frustrated with me about it."},
+            {"role": "assistant", "content": "That sounds like it's bleeding into home life too. Is there anything you've been able to do to get some distance from it?"},
+            {"role": "user", "content": "Not really. I've tried leaving my phone in the other room but I always go back."},
+            {"role": "assistant", "content": "It sounds like the pull is pretty strong. Do you feel like things might settle down at work, or does this feel more open-ended?"},
+            {"role": "user", "content": "I really don't know. But I feel like I've said everything. That's about it."},
+        ]
+        resp = asyncio.run(_respond(llm, system, msgs))
+        print(f"\n[CTRL natural wrap]\n{resp}")
+        # At turn 8 (at the floor) with substantive content, wrapping up is acceptable
+        # Agent may ask one more gentle question or begin closing — both are fine
+        assert resp.strip(), "Agent returned empty response."
+
+
+class TestControlPoliticsFollowUpDepth:
+    """After participant raises one political topic, agent must probe deeper into it."""
+
+    OPENING = (
+        "Welcome, and thanks for taking the time to chat with me today. "
+        "We're going to have an open conversation about whatever's on your mind "
+        "politically. I want to start with something open — when you think about "
+        "the political situation in the US right now, what's on your mind?"
+    )
+
+    def test_dives_deeper_into_raised_topic(self) -> None:
+        """After 'the economy', agent asks what specifically about the economy."""
+        llm = _make_llm()
+        system = _system("control_politics", Stage.STAGE_1, turn=2)
+        msgs = [
+            {"role": "assistant", "content": self.OPENING},
+            {"role": "user", "content": "I've been worried about inflation — groceries are so expensive."},
+            {"role": "assistant", "content": "What about it has been hitting you hardest?"},
+            {"role": "user", "content": "Everything costs more but my salary hasn't changed."},
+        ]
+        resp = asyncio.run(_respond(llm, system, msgs))
+        print(f"\n[CP depth test]\n{resp}")
+        assert _probes(resp), f"Agent stopped probing after thin follow-up.\n{resp}"
+        assert not _asks_for_new_topic(resp), (
+            f"Agent asked for a new political topic instead of going deeper.\n{resp}"
+        )
+
+    def test_does_not_close_early_on_winding_down(self) -> None:
+        """'I think that covers it' at turn 2 — must not close early (below n=8 floor)."""
+        llm = _make_llm()
+        system = _system("control_politics", Stage.STAGE_1, turn=2)
+        msgs = [
+            {"role": "assistant", "content": self.OPENING},
+            {"role": "user", "content": "Inflation has been the big thing on my mind."},
+            {"role": "assistant", "content": "What about it has been on your mind specifically?"},
+            {"role": "user", "content": "I think that covers it, nothing else really."},
+        ]
+        resp = asyncio.run(_respond(llm, system, msgs))
+        print(f"\n[CP no early close turn=2]\n{resp}")
+        assert _probes(resp), f"Agent wrapped up after only 2 turns.\n{resp}"
+        assert "thank" not in resp.lower()[:60], (
+            f"Agent started closing after only 2 turns.\n{resp}"
+        )
+
+    def test_does_not_close_at_turn_7(self) -> None:
+        """'I'm done' at turn 7 — still one below the n=8 floor, must keep probing."""
+        llm = _make_llm()
+        system = _system("control_politics", Stage.STAGE_1, turn=7)
+        msgs = [
+            {"role": "assistant", "content": self.OPENING},
+            {"role": "user", "content": "Inflation is the big one for me — groceries are so expensive."},
+            {"role": "assistant", "content": "What about it has been hitting you hardest?"},
+            {"role": "user", "content": "Everything costs more but my salary hasn't changed."},
+            {"role": "assistant", "content": "Has that changed how you're making decisions day to day?"},
+            {"role": "user", "content": "Yeah, we've cut back on eating out and some subscriptions."},
+            {"role": "assistant", "content": "Do you see this as a temporary thing or something that's changed your habits longer term?"},
+            {"role": "user", "content": "Probably longer term, honestly."},
+            {"role": "assistant", "content": "Has it changed how you feel about the politicians handling it?"},
+            {"role": "user", "content": "Yes, I'm frustrated. But I think I'm done talking about this."},
+            {"role": "assistant", "content": "I hear you. One more thing I'm curious about — when you say frustrated, is that more about the policies themselves or how leaders are communicating about it?"},
+            {"role": "user", "content": "Both I guess. Anyway I don't have more to say."},
+        ]
+        resp = asyncio.run(_respond(llm, system, msgs))
+        print(f"\n[CP no early close turn=7]\n{resp}")
+        # Turn 7 is still below the n=8 floor — agent must not close yet
+        assert _probes(resp), f"Agent wrapped up at turn 7 (below n=8 floor).\n{resp}"
+        assert "thank" not in resp.lower()[:60], (
+            f"Agent started closing at turn 7, before the n=8 floor.\n{resp}"
+        )

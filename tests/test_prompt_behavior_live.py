@@ -250,6 +250,115 @@ def test_control_politics_s1_rejects_vague_verdict() -> None:
     )
 
 
+# ---------------------------------------------------------------------------
+# common_identity — floor enforcement
+# ---------------------------------------------------------------------------
+
+def test_common_identity_s1_keeps_probing_at_turn_1() -> None:
+    """Even if a feeling is expressed, agent must stay in S1 at turn 1 (floor n>=2)."""
+    llm = _make_llm()
+    system = _system("common_identity", Stage.STAGE_1, turn=1)
+    messages = [
+        {"role": "assistant", "content": (
+            "When you think about people who support Republicans, "
+            "what's the feeling that comes up most for you?"
+        )},
+        {"role": "user", "content": "Honestly, I feel pretty frustrated with them."},
+    ]
+    response = asyncio.run(_respond(llm, system, messages))
+    print(f"\n[common_identity S1 turn=1] response:\n{response}\n")
+
+    # At turn 1 the pipeline stays in S1, so the agent should ask a follow-up,
+    # not jump to media distortion or close the stage.
+    advances = _advances_stage(response, ["where those feelings come from", "what sources"])
+    assert not advances, f"Agent jumped to S2 framing at turn 1 (below n=2 floor).\n{response}"
+    assert _probes_for_more(response), f"Agent did not probe deeper at turn 1.\n{response}"
+
+
+def test_common_identity_s4_wraps_at_turn_2() -> None:
+    """S4 at turn 2 (meeting the n>=2 floor) should feel like a natural close."""
+    llm = _make_llm()
+    system = _system("common_identity", Stage.STAGE_4, turn=2)
+    messages = [
+        {"role": "assistant", "content": (
+            "It sounds like, beneath the political labels, there's something you share "
+            "with the people you disagree with. What do you think that common ground is?"
+        )},
+        {"role": "user", "content": (
+            "I guess we all just want the country to be stable and safe, "
+            "even if we disagree about how."
+        )},
+    ]
+    response = asyncio.run(_respond(llm, system, messages))
+    print(f"\n[common_identity S4 turn=2] response:\n{response}\n")
+
+    # S4 is the closing/reflection stage — the agent should not be probing hard
+    # as if still mid-conversation, but should acknowledge and begin wrapping.
+    assert not _advances_stage(response, ["we've covered everything", "goodbye", "bye"]), (
+        f"Agent used a premature hard close in S4.\n{response}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# personal_narrative — floor enforcement
+# ---------------------------------------------------------------------------
+
+def test_personal_narrative_s4_does_not_close_at_turn_1() -> None:
+    """S4 at turn 1 must not generate a goodbye — floor is n>=2 on signal path."""
+    llm = _make_llm()
+    system = _system(
+        "personal_narrative", Stage.STAGE_4,
+        signals={"person_label": "my uncle", "origins_explored": True},
+        turn=1,
+    )
+    messages = [
+        {"role": "assistant", "content": (
+            "It sounds like your uncle's views grew out of real experiences. "
+            "Do you think that's true of most people — that their politics come "
+            "from where they've been in life?"
+        )},
+        {"role": "user", "content": "Yeah, I think so. People are shaped by what they've lived through."},
+    ]
+    response = asyncio.run(_respond(llm, system, messages))
+    print(f"\n[personal_narrative S4 turn=1] response:\n{response}\n")
+
+    goodbye_phrases = ["thank you for sharing", "thanks for sharing", "goodbye", "take care", "that's all"]
+    closes_early = any(p in response.lower() for p in goodbye_phrases)
+    assert not closes_early, f"Agent generated a closing message at S4 turn 1 (below n=2 floor).\n{response}"
+    assert _probes_for_more(response), f"Agent did not probe deeper at S4 turn 1.\n{response}"
+
+
+def test_personal_narrative_s4_wraps_at_turn_2() -> None:
+    """S4 at turn 2 with generalization signal should move toward a natural close."""
+    llm = _make_llm()
+    system = _system(
+        "personal_narrative", Stage.STAGE_4,
+        signals={"person_label": "my uncle", "origins_explored": True, "generalization_reflected": True},
+        turn=2,
+    )
+    messages = [
+        {"role": "assistant", "content": (
+            "Do you think that's true of most people — that their politics come "
+            "from where they've been in life?"
+        )},
+        {"role": "user", "content": "Yeah. And I think I judge people less harshly now that I think about it that way."},
+        {"role": "assistant", "content": (
+            "That's a meaningful shift. Does thinking about your uncle that way "
+            "change how you feel about the broader disagreements you see politically?"
+        )},
+        {"role": "user", "content": "A little, yeah. I'm still frustrated, but I try to remember people have reasons."},
+    ]
+    response = asyncio.run(_respond(llm, system, messages))
+    print(f"\n[personal_narrative S4 turn=2] response:\n{response}\n")
+
+    # At turn 2 the pipeline can fire COMPLETE — S4 prompt should feel like a wrap,
+    # not a hard probe demanding more. A question is OK (gentle close) but hard probes are not.
+    hard_probes = ["tell me more about", "could you explain", "say more about", "help me understand"]
+    assert not any(p in response.lower() for p in hard_probes), (
+        f"Agent is still hard-probing at S4 turn 2 — should be winding down.\n{response}"
+    )
+
+
 if __name__ == "__main__":
     cases = [
         ("common_identity S1 vague label", test_common_identity_s1_rejects_vague_label),
@@ -257,6 +366,10 @@ if __name__ == "__main__":
         ("misperception S1 evaluative sentence", test_misperception_s1_rejects_evaluative_sentence),
         ("control S1 status label", test_control_s1_rejects_status_label),
         ("control_politics S1 vague verdict", test_control_politics_s1_rejects_vague_verdict),
+        ("common_identity S1 keeps probing turn=1", test_common_identity_s1_keeps_probing_at_turn_1),
+        ("common_identity S4 wraps at turn=2", test_common_identity_s4_wraps_at_turn_2),
+        ("personal_narrative S4 no close at turn=1", test_personal_narrative_s4_does_not_close_at_turn_1),
+        ("personal_narrative S4 wraps at turn=2", test_personal_narrative_s4_wraps_at_turn_2),
     ]
     passed = failed = 0
     for name, fn in cases:

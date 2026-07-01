@@ -38,30 +38,31 @@ Predicate = Callable[[dict, int], bool]
 
 _TRANSITIONS: dict[str, list[tuple[Stage, Stage, Predicate]]] = {
     "common_identity": [
-        # n>=4 safety net: if participant never expresses a feeling after 4 turns, move on.
+        # n>=2 floor / n>=4 cap: spend at least 2 turns on feeling before advancing.
         (Stage.STAGE_1, Stage.STAGE_2,
-         lambda s, n: (bool(s.get("feeling_expressed")) and n >= 1) or n >= 4),
-        # n>=5 safety net: if participant never acknowledges media distortion after 5 turns, move on.
+         lambda s, n: (bool(s.get("feeling_expressed")) and n >= 2) or n >= 4),
+        # n>=3 floor / n>=5 cap: spend at least 3 turns on media distortion before advancing.
         (Stage.STAGE_2, Stage.STAGE_3,
-         lambda s, n: (bool(s.get("media_distortion_acknowledged")) and n >= 2) or n >= 5),
-        # n>=4 safety net: if participant never describes common identity after 4 turns, move on.
+         lambda s, n: (bool(s.get("media_distortion_acknowledged")) and n >= 3) or n >= 5),
+        # n>=2 floor / n>=4 cap: spend at least 2 turns on common identity before advancing.
         (Stage.STAGE_3, Stage.STAGE_4,
-         lambda s, n: (bool(s.get("common_identity_described")) and n >= 1) or n >= 4),
-        (Stage.STAGE_4, Stage.COMPLETE, lambda s, n: n >= 1),
+         lambda s, n: (bool(s.get("common_identity_described")) and n >= 2) or n >= 4),
+        # n>=2 floor: match control S4 minimum; total min = 2+3+2+2 = 9.
+        (Stage.STAGE_4, Stage.COMPLETE, lambda s, n: n >= 2),
     ],
     "personal_narrative": [
-        # n>=4 safety net: if participant never names a person after 4 turns, move on.
+        # n>=2 floor / n>=4 cap: spend at least 2 turns identifying the person.
         (Stage.STAGE_1, Stage.STAGE_2,
-         lambda s, n: (s.get("person_label") is not None and n >= 1) or n >= 4),
-        # n>=6 safety net: if participant never gives enough detail after 6 turns, move on.
+         lambda s, n: (s.get("person_label") is not None and n >= 2) or n >= 4),
+        # n>=3 floor / n>=6 cap: spend at least 3 turns gathering detail.
         (Stage.STAGE_2, Stage.STAGE_3,
-         lambda s, n: (s.get("person_details_count", 0) >= 2 and n >= 2) or n >= 6),
-        # n>=5 safety net: if participant never speculates on origins after 5 turns, move on.
+         lambda s, n: (s.get("person_details_count", 0) >= 2 and n >= 3) or n >= 6),
+        # n>=2 floor / n>=5 cap: spend at least 2 turns on origins.
         (Stage.STAGE_3, Stage.STAGE_4,
-         lambda s, n: (bool(s.get("origins_explored")) and n >= 1) or n >= 5),
-        # n>=6 safety net: signal-only by default, but conversations must eventually end.
+         lambda s, n: (bool(s.get("origins_explored")) and n >= 2) or n >= 5),
+        # n>=2 floor on signal path / n>=6 cap; total min = 2+3+2+2 = 9.
         (Stage.STAGE_4, Stage.COMPLETE,
-         lambda s, n: bool(s.get("generalization_reflected")) or n >= 6),
+         lambda s, n: (bool(s.get("generalization_reflected")) and n >= 2) or n >= 6),
     ],
     "misperception_correction": [
         (Stage.STAGE_1, Stage.STAGE_2, lambda s, n: n >= 1),
@@ -85,14 +86,16 @@ _TRANSITIONS: dict[str, list[tuple[Stage, Stage, Predicate]]] = {
     # STAGE_1 prompt also now proactively checks in around turn 4 instead of
     # waiting for the user to bring up closing.
     "control": [
+        # n>=8 floor: match ~10-turn natural depth of structured conditions.
+        # n>=12 safety net: ensures completion for fully uncooperative participants.
         (Stage.STAGE_1, Stage.STAGE_4,
-         lambda s, n: (bool(s.get("winding_down")) and n >= 2) or n >= 5),
+         lambda s, n: (bool(s.get("winding_down")) and n >= 8) or n >= 12),
         (Stage.STAGE_4, Stage.COMPLETE,
          lambda s, n: bool(s.get("winding_down")) or n >= 2),
     ],
     "control_politics": [
         (Stage.STAGE_1, Stage.STAGE_4,
-         lambda s, n: (bool(s.get("winding_down")) and n >= 2) or n >= 5),
+         lambda s, n: (bool(s.get("winding_down")) and n >= 8) or n >= 12),
         (Stage.STAGE_4, Stage.COMPLETE,
          lambda s, n: bool(s.get("winding_down")) or n >= 2),
     ],
