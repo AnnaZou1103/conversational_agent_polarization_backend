@@ -38,27 +38,36 @@ Predicate = Callable[[dict, int], bool]
 
 _TRANSITIONS: dict[str, list[tuple[Stage, Stage, Predicate]]] = {
     "common_identity": [
+        # n>=4 safety net: if participant never expresses a feeling after 4 turns, move on.
         (Stage.STAGE_1, Stage.STAGE_2,
-         lambda s, n: bool(s.get("feeling_expressed")) and n >= 1),
+         lambda s, n: (bool(s.get("feeling_expressed")) and n >= 1) or n >= 4),
+        # n>=5 safety net: if participant never acknowledges media distortion after 5 turns, move on.
         (Stage.STAGE_2, Stage.STAGE_3,
-         lambda s, n: bool(s.get("media_distortion_acknowledged")) and n >= 2),
+         lambda s, n: (bool(s.get("media_distortion_acknowledged")) and n >= 2) or n >= 5),
+        # n>=4 safety net: if participant never describes common identity after 4 turns, move on.
         (Stage.STAGE_3, Stage.STAGE_4,
-         lambda s, n: bool(s.get("common_identity_described")) and n >= 1),
+         lambda s, n: (bool(s.get("common_identity_described")) and n >= 1) or n >= 4),
         (Stage.STAGE_4, Stage.COMPLETE, lambda s, n: n >= 1),
     ],
     "personal_narrative": [
+        # n>=4 safety net: if participant never names a person after 4 turns, move on.
         (Stage.STAGE_1, Stage.STAGE_2,
-         lambda s, n: s.get("person_label") is not None and n >= 1),
+         lambda s, n: (s.get("person_label") is not None and n >= 1) or n >= 4),
+        # n>=6 safety net: if participant never gives enough detail after 6 turns, move on.
         (Stage.STAGE_2, Stage.STAGE_3,
-         lambda s, n: s.get("person_details_count", 0) >= 2 and n >= 2),
+         lambda s, n: (s.get("person_details_count", 0) >= 2 and n >= 2) or n >= 6),
+        # n>=5 safety net: if participant never speculates on origins after 5 turns, move on.
         (Stage.STAGE_3, Stage.STAGE_4,
-         lambda s, n: bool(s.get("origins_explored")) and n >= 1),
-        (Stage.STAGE_4, Stage.COMPLETE, lambda s, n: n >= 1),
+         lambda s, n: (bool(s.get("origins_explored")) and n >= 1) or n >= 5),
+        # n>=6 safety net: signal-only by default, but conversations must eventually end.
+        (Stage.STAGE_4, Stage.COMPLETE,
+         lambda s, n: bool(s.get("generalization_reflected")) or n >= 6),
     ],
     "misperception_correction": [
         (Stage.STAGE_1, Stage.STAGE_2, lambda s, n: n >= 1),
+        # n>=15 safety net: quiz has 8 questions; 15 turns is generous for uncooperative users.
         (Stage.STAGE_2, Stage.STAGE_3,
-         lambda s, n: s.get("questions_answered", 0) >= 8),
+         lambda s, n: s.get("questions_answered", 0) >= 8 or n >= 15),
         (Stage.STAGE_3, Stage.STAGE_4,
          lambda s, n: bool(s.get("reflection_shared")) or n >= 4),
         (Stage.STAGE_4, Stage.COMPLETE, lambda s, n: n >= 2),
@@ -112,6 +121,19 @@ class StageController:
         """
         # COMPLETE is terminal
         if state.stage == Stage.COMPLETE:
+            return Stage.COMPLETE
+
+        # Global escape hatch: user explicitly asked to end the conversation.
+        # Overrides all per-condition rules so the state is always recorded as
+        # COMPLETE (the COMPLETE prompt then generates the proper goodbye).
+        if state.signals.get("user_abort"):
+            logger.info(
+                "User abort detected — forcing COMPLETE (condition=%s, stage=%s)",
+                state.strategy,
+                state.stage.value,
+            )
+            state.stage_turn_count = 0
+            state.stage = Stage.COMPLETE
             return Stage.COMPLETE
 
         rules = _TRANSITIONS.get(state.strategy, [])

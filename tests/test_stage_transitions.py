@@ -73,10 +73,10 @@ def test_common_identity_full_path() -> None:
 
 
 def test_common_identity_blocks_without_signal() -> None:
-    # Signal missing -> stay, even with plenty of turns.
-    s = _evaluate("common_identity", Stage.STAGE_1, 5, {})
+    # Signal missing AND below safety-net cap (n=3 < 4) -> stay.
+    s = _evaluate("common_identity", Stage.STAGE_1, 3, {})
     assert s.stage == Stage.STAGE_1
-    assert s.stage_turn_count == 5  # not reset when staying
+    assert s.stage_turn_count == 3  # not reset when staying
 
 
 def test_common_identity_blocks_without_turns() -> None:
@@ -106,6 +106,16 @@ def test_personal_narrative_details_and_origins() -> None:
     assert s.stage == Stage.STAGE_2  # below threshold
 
     s = _evaluate("personal_narrative", Stage.STAGE_3, 1, {"origins_explored": True})
+    assert s.stage == Stage.STAGE_4
+
+
+def test_personal_narrative_s4_generalization() -> None:
+    # Signal fires -> advance immediately even on turn 1.
+    s = _evaluate("personal_narrative", Stage.STAGE_4, 1, {"generalization_reflected": True})
+    assert s.stage == Stage.COMPLETE
+
+    # No signal AND below safety-net cap (n=5 < 6) -> stay.
+    s = _evaluate("personal_narrative", Stage.STAGE_4, 5, {})
     assert s.stage == Stage.STAGE_4
 
 
@@ -168,9 +178,9 @@ def test_forward_transition_resets_counter() -> None:
 
 
 def test_stay_does_not_reset_counter() -> None:
-    s = _evaluate("common_identity", Stage.STAGE_3, 4, {})  # no signal
+    s = _evaluate("common_identity", Stage.STAGE_3, 3, {})  # no signal, below cap (n=3 < 4)
     assert s.stage == Stage.STAGE_3
-    assert s.stage_turn_count == 4
+    assert s.stage_turn_count == 3
 
 
 def test_complete_is_terminal() -> None:
@@ -321,6 +331,109 @@ def test_post_completion_message_short_circuits() -> None:
     assert llm.complete_calls == 0, "no OBSERVE/STAGE/THINK calls after completion"
     assert llm.stream_calls == 0, "no response generation after completion"
     assert mock_log_turn.call_count == 0, "re-entry pings should not be logged as turns"
+
+
+# ---------------------------------------------------------------------------
+# Non-cooperation: safety nets guarantee COMPLETE even with no signals
+# ---------------------------------------------------------------------------
+#
+# Each test simulates a fully uncooperative participant — every turn produces
+# empty signals — and verifies that the stage machine still reaches COMPLETE
+# within the cap, then stops there.
+
+def _advance_no_signal(strategy: str, start_stage: Stage, cap: int) -> Stage:
+    """Simulate `cap` turns of empty signals from `start_stage`; return final stage."""
+    state = SessionState(
+        study_id="t",
+        strategy=strategy,
+        stage=start_stage,
+        stage_turn_count=0,
+        signals={},
+    )
+    for _ in range(cap):
+        if state.stage == Stage.COMPLETE:
+            break
+        state.stage_turn_count += 1
+        asyncio.run(_controller.evaluate_transition(state, "ok"))
+    return state.stage
+
+
+def test_common_identity_always_completes_without_signals() -> None:
+    # S1 -> S2 safety net fires at n=4
+    s = _evaluate("common_identity", Stage.STAGE_1, 4, {})
+    assert s.stage == Stage.STAGE_2, "S1 safety net did not fire"
+
+    # S2 -> S3 safety net fires at n=5
+    s = _evaluate("common_identity", Stage.STAGE_2, 5, {})
+    assert s.stage == Stage.STAGE_3, "S2 safety net did not fire"
+
+    # S3 -> S4 safety net fires at n=4
+    s = _evaluate("common_identity", Stage.STAGE_3, 4, {})
+    assert s.stage == Stage.STAGE_4, "S3 safety net did not fire"
+
+    # Full run: starting from S1, must reach COMPLETE within 20 turns
+    final = _advance_no_signal("common_identity", Stage.STAGE_1, 20)
+    assert final == Stage.COMPLETE, f"common_identity stuck at {final} with no signals"
+
+
+def test_common_identity_signal_still_advances_before_cap() -> None:
+    # Signals should advance earlier than the cap (not blocked by safety net logic)
+    s = _evaluate("common_identity", Stage.STAGE_1, 1, {"feeling_expressed": True})
+    assert s.stage == Stage.STAGE_2
+    s = _evaluate("common_identity", Stage.STAGE_2, 2, {"media_distortion_acknowledged": True})
+    assert s.stage == Stage.STAGE_3
+    s = _evaluate("common_identity", Stage.STAGE_3, 1, {"common_identity_described": True})
+    assert s.stage == Stage.STAGE_4
+
+
+def test_personal_narrative_always_completes_without_signals() -> None:
+    # S1 -> S2 safety net fires at n=4
+    s = _evaluate("personal_narrative", Stage.STAGE_1, 4, {})
+    assert s.stage == Stage.STAGE_2, "S1 safety net did not fire"
+
+    # S2 -> S3 safety net fires at n=6
+    s = _evaluate("personal_narrative", Stage.STAGE_2, 6, {})
+    assert s.stage == Stage.STAGE_3, "S2 safety net did not fire"
+
+    # S3 -> S4 safety net fires at n=5
+    s = _evaluate("personal_narrative", Stage.STAGE_3, 5, {})
+    assert s.stage == Stage.STAGE_4, "S3 safety net did not fire"
+
+    # S4 -> COMPLETE safety net fires at n=6
+    s = _evaluate("personal_narrative", Stage.STAGE_4, 6, {})
+    assert s.stage == Stage.COMPLETE, "S4 safety net did not fire"
+
+    # Full run: starting from S1, must reach COMPLETE within 30 turns
+    final = _advance_no_signal("personal_narrative", Stage.STAGE_1, 30)
+    assert final == Stage.COMPLETE, f"personal_narrative stuck at {final} with no signals"
+
+
+def test_personal_narrative_s4_signal_still_wins_before_cap() -> None:
+    # generalization_reflected should still advance immediately
+    s = _evaluate("personal_narrative", Stage.STAGE_4, 1, {"generalization_reflected": True})
+    assert s.stage == Stage.COMPLETE
+
+
+def test_personal_narrative_s4_safety_net_does_not_fire_early() -> None:
+    # The safety net cap is n>=6, so n=5 must stay
+    s = _evaluate("personal_narrative", Stage.STAGE_4, 5, {})
+    assert s.stage == Stage.STAGE_4, "S4 safety net fired too early (before n=6)"
+
+
+def test_misperception_always_completes_without_signals() -> None:
+    # S2 -> S3 safety net fires at n=15 (quiz cap)
+    s = _evaluate("misperception_correction", Stage.STAGE_2, 15, {})
+    assert s.stage == Stage.STAGE_3, "S2 (quiz) safety net did not fire"
+
+    # Full run from S1
+    final = _advance_no_signal("misperception_correction", Stage.STAGE_1, 25)
+    assert final == Stage.COMPLETE, f"misperception_correction stuck at {final} with no signals"
+
+
+def test_control_conditions_already_have_safety_nets() -> None:
+    for strategy in ("control", "control_politics"):
+        final = _advance_no_signal(strategy, Stage.STAGE_1, 10)
+        assert final == Stage.COMPLETE, f"{strategy} stuck at {final} with no signals"
 
 
 if __name__ == "__main__":

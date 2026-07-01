@@ -95,7 +95,8 @@ def test_stage1_does_not_advance_on_turn_0() -> None:
 
 @pytest.mark.parametrize("answered", [0, 1, 4, 7])
 def test_stage2_blocked_before_all_8_answered(answered: int) -> None:
-    s = _evaluate(Stage.STAGE_2, 20, {"questions_answered": answered})
+    # n=14 is below the safety-net cap (n>=15), so < 8 answers must still stay.
+    s = _evaluate(Stage.STAGE_2, 14, {"questions_answered": answered})
     assert s.stage == Stage.STAGE_2, f"must stay in stage_2 with {answered} answered"
 
 
@@ -479,11 +480,12 @@ def test_full_workflow_with_fallbacks() -> None:
     s = _evaluate(Stage.STAGE_1, 1, {})
     assert s.stage == Stage.STAGE_2
 
-    # Stage 2: stuck with no answers — eventually the LLM is supposed to loop,
-    # but questions_answered comes from OBSERVE; we test the gate holds as long
-    # as it's < 8 (no safety net on stage_2 — the quiz must be completed).
-    s = _evaluate(Stage.STAGE_2, 100, {"questions_answered": 7})
+    # Stage 2: below the safety-net cap (n=14 < 15) with < 8 answers — still blocked.
+    s = _evaluate(Stage.STAGE_2, 14, {"questions_answered": 7})
     assert s.stage == Stage.STAGE_2
+    # Safety-net cap fires at n=15 even with < 8 answers (uncooperative participant).
+    s = _evaluate(Stage.STAGE_2, 15, {"questions_answered": 7})
+    assert s.stage == Stage.STAGE_3
 
     # Stage 3: safety net at n >= 4
     s = _evaluate(Stage.STAGE_3, 4, {})

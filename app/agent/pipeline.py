@@ -113,12 +113,17 @@ def _mark_user_screened(study_id: str) -> None:
 
 
 def _minutes_since_session_start(messages: list[dict]) -> float | None:
-    """Minutes elapsed since the earliest timestamped message in `messages`.
+    """Minutes elapsed since the first timestamped participant message.
 
-    Returns None if no message carries a timestamp (e.g. brand-new session).
+    Returns None if no user message carries a timestamp (e.g. brand-new session).
     """
     first_timestamp = next(
-        (m.get("timestamp") for m in messages if m.get("timestamp")), None
+        (
+            m.get("timestamp")
+            for m in messages
+            if m.get("role") == "user" and m.get("timestamp")
+        ),
+        None,
     )
     if not first_timestamp:
         return None
