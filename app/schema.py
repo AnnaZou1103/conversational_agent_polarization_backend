@@ -160,8 +160,15 @@ class MCObservation(CaseModel):
 class ControlObservation(CaseModel):
     topics_shared: list[str] = []
     current_mood: Optional[str] = None
+    main_takeaway: Optional[str] = None
+
+
+class ControlPoliticsObservation(CaseModel):
+    topics_shared: list[str] = []
+    current_mood: Optional[str] = None
+    main_concern: Optional[str] = None
 
 
 class ChatObservation(CaseModel):
     stage: str
-    observation: Union[CIObservation, PNObservation, MCObservation, ControlObservation]
+    observation: Union[CIObservation, PNObservation, MCObservation, ControlObservation, ControlPoliticsObservation]

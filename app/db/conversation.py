@@ -9,6 +9,7 @@ from app.schema import (
     ChatObservation,
     QuizQuestion,
     ControlObservation,
+    ControlPoliticsObservation,
 )
 from app.db.documents import conversation_docs
 
@@ -111,7 +112,15 @@ def _get_personal_narrative_observation(signals: dict) -> PNObservation:
 def _get_control_observation(signals: dict) -> ControlObservation:
     topics_shared = signals.get("topics_shared", [])
     current_mood = signals.get("current_mood")
-    return ControlObservation(topics_shared=topics_shared, current_mood=current_mood)
+    main_takeaway = signals.get("main_takeaway")
+    return ControlObservation(topics_shared=topics_shared, current_mood=current_mood, main_takeaway=main_takeaway)
+
+
+def _get_control_politics_observation(signals: dict) -> ControlPoliticsObservation:
+    topics_shared = signals.get("topics_shared", [])
+    current_mood = signals.get("current_mood")
+    main_concern = signals.get("main_concern")
+    return ControlPoliticsObservation(topics_shared=topics_shared, current_mood=current_mood, main_concern=main_concern)
 
 
 def _get_misperception_correction_observation(signals: dict) -> MCObservation:
@@ -153,7 +162,7 @@ strategy_observation = {
     "personal_narrative": _get_personal_narrative_observation,
     "misperception_correction": _get_misperception_correction_observation,
     "control": _get_control_observation,
-    "control_politics": _get_control_observation,
+    "control_politics": _get_control_politics_observation,
 }
 
 
