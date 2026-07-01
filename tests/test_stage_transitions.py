@@ -124,8 +124,10 @@ def test_misperception_quiz_gate() -> None:
                   {"reflection_shared": True})
     assert s.stage == Stage.STAGE_4
 
-    # Safety net: n>=2 advances even without reflection_shared (catches "Nothing"/"Okay")
-    s = _evaluate("misperception_correction", Stage.STAGE_3, 2, {})
+    # Safety net: n>=4 advances even without reflection_shared (4-turn fallback)
+    s = _evaluate("misperception_correction", Stage.STAGE_3, 3, {})
+    assert s.stage == Stage.STAGE_3  # not yet
+    s = _evaluate("misperception_correction", Stage.STAGE_3, 4, {})
     assert s.stage == Stage.STAGE_4
 
 
