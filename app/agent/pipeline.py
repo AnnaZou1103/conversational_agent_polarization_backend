@@ -13,7 +13,7 @@ from app.agent.strategies import Strategy
 from app.agent.prompts import OBSERVE_PROMPTS, THINK_PROMPT, build_system_prompt
 from app.agent.safety import (
     SafetyVerdict,
-    TERMINATION_REENTRY_MESSAGE,
+    CONSECUTIVE_REMINDER_LIMIT,
     evaluate_message,
 )
 from app.config import settings
@@ -341,11 +341,6 @@ class AgentPipeline:
         state = build_session_state(study_id, strategy_name, messages)
         state.metadata["study_id"] = study_id
 
-        # Short-circuit any subsequent requests to an already-terminated session.
-        if state.terminated_by_safety:
-            yield TERMINATION_REENTRY_MESSAGE
-            return
-
         # The conversation already reached COMPLETE on a previous turn (the
         # survey button is showing). A restored stage of COMPLETE means a prior
         # turn closed it out — the turn that FIRST reaches COMPLETE restores an
@@ -420,31 +415,22 @@ class AgentPipeline:
                 state.safety_history.append(verdict.to_dict())
                 state.previous_user_message = user_message
                 log_safety_event(settings.conversations_dir, state, verdict)
-                logger.info(
-                    "Safety reminder for session %s: %s (consecutive=%d)",
-                    state.study_id,
-                    verdict.reason,
-                    state.consecutive_reminders,
-                )
+                if state.consecutive_reminders >= CONSECUTIVE_REMINDER_LIMIT:
+                    logger.warning(
+                        "Session %s: %d consecutive safety reminders (%s) — "
+                        "participant is persistently disruptive",
+                        state.study_id,
+                        state.consecutive_reminders,
+                        verdict.category,
+                    )
+                else:
+                    logger.info(
+                        "Safety reminder for session %s: %s (consecutive=%d)",
+                        state.study_id,
+                        verdict.reason,
+                        state.consecutive_reminders,
+                    )
                 yield verdict.reminder_text
-                return
-
-            if verdict.action == "terminate":
-                state.terminated_by_safety = True
-                state.stage = Stage.COMPLETE
-                state.consecutive_reminders = verdict.consecutive_reminders
-                state.invalid_count = verdict.invalid_count
-                state.indecent_count = verdict.indecent_count
-                state.safety_history.append(verdict.to_dict())
-                state.previous_user_message = user_message
-                log_safety_event(settings.conversations_dir, state, verdict)
-                _mark_user_screened(state.study_id)
-                logger.info(
-                    "Safety termination for session %s: %s",
-                    state.study_id,
-                    verdict.reason,
-                )
-                yield verdict.termination_text
                 return
 
             # Clean message — reset the consecutive-reminder streak and record this

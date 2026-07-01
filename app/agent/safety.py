@@ -24,41 +24,50 @@ GIBBERISH_REMINDERS = [
     # Strike 1 — gentle, assumes accident or confusion
     "I'm having a little trouble following that. Could you share your thought "
     "in a full sentence?",
-    # Strike 2 — firmer, last-warning tone
+    # Strike 2 — firmer, suggests closing if needed
     "I'm still having trouble following. Could you put your answer in a clear "
     "sentence? If now isn't a good time to continue, you can close the chat.",
+    # Strike 3 — invites rephrasing
+    "I want to make sure I understand you — could you try rephrasing that as "
+    "a complete thought?",
+    # Strike 4 — patient but direct
+    "I'm having difficulty making sense of your message. Please take a moment "
+    "and share what's on your mind in a full sentence.",
+    # Strike 5+ — open-ended, no pressure
+    "I haven't been able to follow your last few messages. Whenever you're "
+    "ready to continue, I'm here — just send a clear sentence and we'll pick "
+    "up from there.",
 ]
 
 INDECENT_REMINDERS = [
-    # Strike 1 — polite redirect, explicit ask for courteous language
+    # Strike 1 — polite redirect
     "This is a research conversation, so please keep the language polite and "
     "respectful. Could you rephrase that?",
-    # Strike 2 — firmer reminder, still focused on polite language
+    # Strike 2 — firmer, suggests closing if needed
     "Another reminder, please use polite language here. If you'd rather not "
     "continue, you can close the chat.",
+    # Strike 3 — keeps door open
+    "I'd like to keep this conversation going, but I do need you to use "
+    "respectful language. Could you try again?",
+    # Strike 4 — frames it as a shared space
+    "We're having a research conversation and I want to make sure it stays a "
+    "comfortable space. Please keep the language courteous.",
+    # Strike 5+ — patient, no ultimatum
+    "I'm still here and happy to continue — whenever you're ready to engage "
+    "respectfully, just send your next message.",
 ]
 
 # Backward-compatible singular aliases — point at the strike-1 wording.
 GIBBERISH_REMINDER = GIBBERISH_REMINDERS[0]
 INDECENT_REMINDER = INDECENT_REMINDERS[0]
 
-TERMINATION_MESSAGE = (
-    "Thanks for participating. It looks like we won't be able to continue this "
-    "conversation. You're welcome to close the chat. Your responses so far "
-    "have been saved."
-)
-
-TERMINATION_REENTRY_MESSAGE = (
-    "This conversation has ended. You can close this chat whenever you're ready."
-)
-
-
 # ---------------------------------------------------------------------------
 # Threshold
 # ---------------------------------------------------------------------------
 
-# Terminate the conversation after this many consecutive reminders are
-# triggered (across any category). A single clean message resets the streak.
+# Log a warning at this consecutive-reminder streak count so operators can
+# monitor persistently disruptive sessions. Does not trigger termination —
+# only the session time limit ends the conversation.
 CONSECUTIVE_REMINDER_LIMIT = 3
 
 
@@ -799,9 +808,11 @@ def evaluate_message(
 ) -> SafetyVerdict:
     """Classify the message and decide action given current session counters.
 
-    Termination rule: any strike that would push `consecutive_reminders` to
-    `CONSECUTIVE_REMINDER_LIMIT` (or above) ends the conversation. A single
-    clean message resets the streak to zero.
+    Gibberish and indecent language never terminate the conversation — the
+    action is always "clean" or "reminder". Termination is handled externally
+    by the session time limit. A single clean message resets the streak to zero.
+    Once the streak exceeds the reminder tier list length, the last tier is
+    repeated indefinitely.
 
     This function is pure (no state mutation). The caller is responsible for
     applying the verdict to session state.
@@ -837,25 +848,10 @@ def evaluate_message(
     new_invalid_count = invalid_count + 1 if gibberish else invalid_count
     new_indecent_count = indecent_count + 1 if indecent else indecent_count
 
-    # The single termination rule: if this strike would make the consecutive
-    # reminder streak hit the limit, end the conversation instead of sending
-    # another reminder.
+    # Send a reminder. Prefer the indecent reminder when both apply (more
+    # specific feedback than the generic gibberish prompt). Cap the tier at the
+    # last available entry so the firmest reminder repeats beyond that.
     prospective_streak = consecutive_reminders + 1
-    if prospective_streak >= CONSECUTIVE_REMINDER_LIMIT:
-        return SafetyVerdict(
-            action="terminate",
-            category=category,
-            reason=f"{CONSECUTIVE_REMINDER_LIMIT} consecutive reminders triggered",
-            termination_text=TERMINATION_MESSAGE,
-            user_message_excerpt=excerpt,
-            consecutive_reminders=prospective_streak,
-            indecent_count=new_indecent_count,
-            invalid_count=new_invalid_count,
-        )
-
-    # Otherwise, send a reminder. Prefer the indecent reminder when both apply
-    # (more specific feedback than the generic gibberish prompt). Pick the tier
-    # by the post-strike streak position (1st strike → tier 0, etc.).
     tier = min(prospective_streak - 1, len(INDECENT_REMINDERS) - 1)
     if indecent:
         reminder_text = INDECENT_REMINDERS[tier]

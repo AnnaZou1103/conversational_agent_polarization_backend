@@ -12,7 +12,6 @@ from app.agent.safety import (  # noqa: E402
     GIBBERISH_REMINDERS,
     INDECENT_REMINDER,
     INDECENT_REMINDERS,
-    TERMINATION_MESSAGE,
     contains_indecent,
     evaluate_message,
     is_exact_repeat,
@@ -207,7 +206,8 @@ def test_first_gibberish_strike_sends_reminder() -> None:
     assert v.invalid_count == 1
 
 
-def test_third_consecutive_gibberish_terminates() -> None:
+def test_third_consecutive_gibberish_uses_tier_2() -> None:
+    """3rd consecutive gibberish uses tier 2 (index 2), not the last tier."""
     v = evaluate_message(
         user_message="qwerty qwerty",
         previous_user_message=None,
@@ -215,10 +215,20 @@ def test_third_consecutive_gibberish_terminates() -> None:
         indecent_count=0,
         invalid_count=2,
     )
-    assert v.action == "terminate"
+    assert v.action == "reminder"
     assert v.category == "gibberish"
-    assert v.termination_text == TERMINATION_MESSAGE
+    assert v.reminder_text == GIBBERISH_REMINDERS[2]
     assert v.consecutive_reminders == 3
+
+
+def test_gibberish_beyond_last_tier_repeats_last() -> None:
+    """6th+ consecutive gibberish repeats the last tier indefinitely."""
+    v5 = evaluate_message("asdfasdf", None, consecutive_reminders=4, indecent_count=0, invalid_count=4)
+    v6 = evaluate_message("asdfasdf", None, consecutive_reminders=5, indecent_count=0, invalid_count=5)
+    v7 = evaluate_message("asdfasdf", None, consecutive_reminders=6, indecent_count=0, invalid_count=6)
+    assert v5.reminder_text == GIBBERISH_REMINDERS[-1]
+    assert v6.reminder_text == GIBBERISH_REMINDERS[-1]
+    assert v7.reminder_text == GIBBERISH_REMINDERS[-1]
 
 
 def test_first_indecent_strike_sends_reminder() -> None:
@@ -267,14 +277,15 @@ def test_second_strike_uses_firmer_tier() -> None:
 
 
 def test_tier_lists_have_required_length() -> None:
-    """Reminder lists must cover every non-terminal strike position."""
+    """Reminder lists must have at least as many tiers as CONSECUTIVE_REMINDER_LIMIT - 1."""
     from app.agent.safety import CONSECUTIVE_REMINDER_LIMIT
     required = CONSECUTIVE_REMINDER_LIMIT - 1
     assert len(GIBBERISH_REMINDERS) >= required
     assert len(INDECENT_REMINDERS) >= required
 
 
-def test_third_consecutive_indecent_terminates() -> None:
+def test_third_consecutive_indecent_uses_tier_2() -> None:
+    """3rd consecutive indecent uses tier 2 (index 2), not the last tier."""
     v = evaluate_message(
         user_message="fucking bullshit",
         previous_user_message=None,
@@ -282,16 +293,22 @@ def test_third_consecutive_indecent_terminates() -> None:
         indecent_count=2,
         invalid_count=0,
     )
-    assert v.action == "terminate"
+    assert v.action == "reminder"
     assert v.category in ("indecent", "both")
+    assert v.reminder_text == INDECENT_REMINDERS[2]
     assert v.consecutive_reminders == 3
-    assert "consecutive reminders" in v.reason.lower()
 
 
-def test_third_consecutive_mixed_categories_terminates() -> None:
-    """1 gibberish + 1 indecent + 1 gibberish in a row → terminate."""
-    # Two strikes already in a row (one gibberish, one indecent); the third
-    # strike of any kind triggers termination.
+def test_indecent_beyond_last_tier_repeats_last() -> None:
+    """6th+ consecutive indecent repeats the last tier indefinitely."""
+    v5 = evaluate_message("fuck this", None, consecutive_reminders=4, indecent_count=4, invalid_count=0)
+    v6 = evaluate_message("fuck this", None, consecutive_reminders=5, indecent_count=5, invalid_count=0)
+    assert v5.reminder_text == INDECENT_REMINDERS[-1]
+    assert v6.reminder_text == INDECENT_REMINDERS[-1]
+
+
+def test_third_consecutive_mixed_categories_repeats_last_tier() -> None:
+    """1 gibberish + 1 indecent + 1 gibberish in a row → reminder, not termination."""
     v = evaluate_message(
         user_message="asdfasdf",
         previous_user_message=None,
@@ -299,9 +316,8 @@ def test_third_consecutive_mixed_categories_terminates() -> None:
         indecent_count=1,
         invalid_count=1,
     )
-    assert v.action == "terminate"
+    assert v.action == "reminder"
     assert v.consecutive_reminders == 3
-    assert "consecutive reminders" in v.reason.lower()
 
 
 def test_clean_message_breaks_the_streak() -> None:
