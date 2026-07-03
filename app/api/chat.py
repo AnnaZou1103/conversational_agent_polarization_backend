@@ -10,9 +10,8 @@ from fastapi.responses import StreamingResponse
 
 from app.schema import ChatCompletionRequest
 from app.agent.pipeline import AgentPipeline
-from app.config import settings
 from app.llm.registry import get_fast_provider, get_provider
-from app.db.user import study_id_is_valid
+from app.db.user import get_user_agent_strategy, study_id_is_valid
 from app.db.conversation import (
     get_chat_history,
     get_conversation,
@@ -50,16 +49,6 @@ def _get_pipeline() -> AgentPipeline:
     if _pipeline is None:
         _pipeline = AgentPipeline(llm=get_provider(), fast_llm=get_fast_provider())
     return _pipeline
-
-
-# Map OpenAI-style model IDs to internal condition names
-_MODEL_TO_CONDITION = {
-    "common-identity": "common_identity",
-    "personal-narrative": "personal_narrative",
-    "misperception-correction": "misperception_correction",
-    "control": "control",
-    "control-politics": "control_politics",
-}
 
 
 _UTILITY_PHRASES = (
@@ -109,8 +98,11 @@ async def chat_completions(request: ChatCompletionRequest):
 
     pipeline = _get_pipeline()
 
-    # Derive condition from model ID, fall back to config default
-    strategy_name = _MODEL_TO_CONDITION.get(request.model, settings.default_strategy)
+    # Use the condition actually assigned to this participant, not the
+    # client-supplied model field (which was previously trusted directly and
+    # silently fell back to a single default condition for any unrecognized
+    # value, collapsing most participants onto one condition).
+    strategy_name = get_user_agent_strategy(study_id=study_id).strategy
 
     messages = _get_history(study_id)
     incoming_text = request.message.text_content()

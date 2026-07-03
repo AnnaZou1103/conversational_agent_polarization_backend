@@ -21,9 +21,6 @@ class Settings(BaseSettings):
     api_port: int = 8080
 
     # Agent configuration
-    default_strategy: str = (
-        "common_identity"  # "common_identity" or "personal_narrative"
-    )
     enable_think: bool = False  # enable internal reasoning step before each response
 
     # Safety
