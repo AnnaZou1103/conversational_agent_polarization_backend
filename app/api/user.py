@@ -17,14 +17,24 @@ router = APIRouter(prefix="/user", tags=["User"])
 
 
 @router.post("/create")
-def create_user_route(strategy: Optional[str] = Query(default=None)):
+def create_user_route(
+    strategy: Optional[str] = Query(default=None),
+    participantId: Optional[str] = Query(default=None),
+    assignmentId: Optional[str] = Query(default=None),
+    projectId: Optional[str] = Query(default=None),
+):
     valid_strategies = {s.value for s in Strategy}
     if strategy is not None and strategy not in valid_strategies:
         raise HTTPException(
             status_code=400,
             detail=f"Invalid strategy. Must be one of: {sorted(valid_strategies)}",
         )
-    study_id = create_study_user(strategy=strategy)
+    study_id = create_study_user(
+        strategy=strategy,
+        participant_id=participantId,
+        assignment_id=assignmentId,
+        project_id=projectId,
+    )
     return {"study_id": study_id}
 
 

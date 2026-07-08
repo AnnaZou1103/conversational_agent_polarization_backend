@@ -15,7 +15,12 @@ def generate_study_id():
     return "".join(random.choices(string.ascii_letters + string.digits, k=6))
 
 
-def create_study_user(strategy: str = None) -> str:
+def create_study_user(
+    strategy: str = None,
+    participant_id: str = None,
+    assignment_id: str = None,
+    project_id: str = None,
+) -> str:
     """Create a single study user. If strategy is given, use it; otherwise assign via balanced round-robin."""
     if strategy is None:
         strategies = [s.value for s in Strategy]
@@ -28,6 +33,9 @@ def create_study_user(strategy: str = None) -> str:
             "type": "study",
             "strategy": strategy,
             "state": "not_started",
+            "participant_id": participant_id,
+            "assignment_id": assignment_id,
+            "project_id": project_id,
             "created_at": datetime.now(timezone.utc),
             "updated_at": datetime.now(timezone.utc),
         }
