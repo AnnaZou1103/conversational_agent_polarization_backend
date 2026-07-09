@@ -24,9 +24,16 @@ PRE_SURVEY_ORDER = [
     "empathyTowardOutgroup",
     "commonEnemy",
     "threatPerception",
+    "rateRepublicansPre",
+    "rateDemocratsPre",
     "preSurveyAttentionCheck",
 ]
 
+# rateRepublicans/rateDemocrats and oqAttitudeChange are the pre-rename/
+# pre-split keys older responses may still have (see "Rebrand header logo,
+# revise participant-facing task copy, and expand post-survey questions" in
+# conversational_agent_polarization) — kept so those older records still
+# sort into a sensible position instead of falling to the end.
 POST_SURVEY_ORDER = [
     "emotionEnthusiastic",
     "emotionHappy",
@@ -37,6 +44,8 @@ POST_SURVEY_ORDER = [
     "completedTask",
     "rateRepublicans",
     "rateDemocrats",
+    "rateRepublicansPost",
+    "rateDemocratsPost",
     "giveCents",
     "reducePollStations",
     "ignoreUnfavorableJudges",
@@ -77,6 +86,9 @@ POST_SURVEY_ORDER = [
     "saSatisfiedOverall",
     "oqSatisfiedWhy",
     "oqAttitudeChange",
+    "attitudeChangeSelf",
+    "oqAttitudeChangeSelfWhy",
+    "attitudeChangeOthers",
     "oqImprove",
 ]
 

@@ -21,7 +21,7 @@ sys.modules.setdefault("app.db.documents", MagicMock(user_docs=MagicMock()))
 
 from app.db.survey import save_pre_survey, save_post_survey
 from app.schema import SurveyResponses
-from app.survey_order import apply_order_prefix, PRE_SURVEY_ORDER
+from app.survey_order import apply_order_prefix, PRE_SURVEY_ORDER, POST_SURVEY_ORDER
 
 
 def _set_payload(mock_user_docs, field: str) -> dict:
@@ -51,6 +51,28 @@ def test_apply_order_prefix_appends_unknown_keys_last():
 
 def test_apply_order_prefix_empty_input():
     assert apply_order_prefix({}, PRE_SURVEY_ORDER) == {}
+
+
+def test_pre_survey_order_includes_feeling_thermometer_questions():
+    # Added when the pre-survey gained its own feeling-thermometer page
+    # (rateRepublicansPre/rateDemocratsPre), right before the attention check.
+    assert PRE_SURVEY_ORDER.index("rateRepublicansPre") < PRE_SURVEY_ORDER.index("preSurveyAttentionCheck")
+    assert PRE_SURVEY_ORDER.index("rateDemocratsPre") < PRE_SURVEY_ORDER.index("preSurveyAttentionCheck")
+
+
+def test_post_survey_order_covers_renamed_and_legacy_thermometer_keys():
+    # rateRepublicans/rateDemocrats (pre-rename) and their *Post replacements
+    # must both be recognized so old and new records sort correctly.
+    for key in ("rateRepublicans", "rateDemocrats", "rateRepublicansPost", "rateDemocratsPost"):
+        assert key in POST_SURVEY_ORDER
+
+
+def test_post_survey_order_covers_attitude_change_split():
+    # oqAttitudeChange (legacy single field) was split into a rating +
+    # open-ended pair, plus a new attitudeChangeOthers rating.
+    for key in ("oqAttitudeChange", "attitudeChangeSelf", "oqAttitudeChangeSelfWhy", "attitudeChangeOthers"):
+        assert key in POST_SURVEY_ORDER
+    assert POST_SURVEY_ORDER.index("attitudeChangeSelf") < POST_SURVEY_ORDER.index("oqImprove")
 
 
 @patch("app.db.survey.user_docs")
