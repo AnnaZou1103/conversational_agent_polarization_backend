@@ -439,6 +439,66 @@ def test_control_conditions_always_complete_without_signals() -> None:
         assert final == Stage.COMPLETE, f"{strategy} stuck at {final} with no signals"
 
 
+# ---------------------------------------------------------------------------
+# Grace extension — an in-progress follow-up thread should not be cut off by
+# the original cap; a fully non-responsive user still is.
+# ---------------------------------------------------------------------------
+
+def test_common_identity_media_grace_extends_cap_when_attempted() -> None:
+    # No attempt at all: original cap (n>=5) still fires.
+    s = _evaluate("common_identity", Stage.STAGE_2, 5, {})
+    assert s.stage == Stage.STAGE_3
+
+    # Genuine partial engagement: original cap (n=5) must NOT fire early...
+    s = _evaluate("common_identity", Stage.STAGE_2, 5,
+                  {"media_distortion_attempted": True})
+    assert s.stage == Stage.STAGE_2, "grace window closed too early"
+
+    # ...but the extended cap (n>=9, cap+4) still fires eventually.
+    s = _evaluate("common_identity", Stage.STAGE_2, 9,
+                  {"media_distortion_attempted": True})
+    assert s.stage == Stage.STAGE_3, "grace window never closes"
+
+
+def test_common_identity_described_grace_extends_cap_when_attempted() -> None:
+    s = _evaluate("common_identity", Stage.STAGE_3, 4, {})
+    assert s.stage == Stage.STAGE_4
+
+    s = _evaluate("common_identity", Stage.STAGE_3, 4,
+                  {"common_identity_attempted": True})
+    assert s.stage == Stage.STAGE_3, "grace window closed too early"
+
+    s = _evaluate("common_identity", Stage.STAGE_3, 8,
+                  {"common_identity_attempted": True})
+    assert s.stage == Stage.STAGE_4, "grace window never closes"
+
+
+def test_personal_narrative_origins_grace_extends_cap_when_attempted() -> None:
+    s = _evaluate("personal_narrative", Stage.STAGE_3, 5, {})
+    assert s.stage == Stage.STAGE_4
+
+    s = _evaluate("personal_narrative", Stage.STAGE_3, 5,
+                  {"origins_attempted": True})
+    assert s.stage == Stage.STAGE_3, "grace window closed too early"
+
+    s = _evaluate("personal_narrative", Stage.STAGE_3, 9,
+                  {"origins_attempted": True})
+    assert s.stage == Stage.STAGE_4, "grace window never closes"
+
+
+def test_personal_narrative_generalization_grace_extends_cap_when_attempted() -> None:
+    s = _evaluate("personal_narrative", Stage.STAGE_4, 6, {})
+    assert s.stage == Stage.COMPLETE
+
+    s = _evaluate("personal_narrative", Stage.STAGE_4, 6,
+                  {"typical_exception_addressed": True})
+    assert s.stage == Stage.STAGE_4, "grace window closed too early"
+
+    s = _evaluate("personal_narrative", Stage.STAGE_4, 10,
+                  {"typical_exception_addressed": True})
+    assert s.stage == Stage.COMPLETE, "grace window never closes"
+
+
 if __name__ == "__main__":
     for _name, _fn in sorted(globals().items()):
         if _name.startswith("test_") and callable(_fn):

@@ -36,17 +36,58 @@ _STAGE_ORDER = (
 # matching; a literal translation would never fire, so we read `person_label`.
 Predicate = Callable[[dict, int], bool]
 
+
+def _gated(
+    signal_key: str,
+    floor: int,
+    cap: int,
+    attempted_key: str | None = None,
+    grace: int = 4,
+) -> Predicate:
+    """Floor/cap threshold, with an optional grace extension for engaged users.
+
+    Fires once `signal_key` is true and `n >= floor`. Otherwise falls back to
+    a turn-count safety net: if the user has never even made a partial attempt
+    (`attempted_key` false), the net closes at the original `cap` — there is
+    nothing to wait for. If they *have* attempted (per the looser
+    `attempted_key` signal — e.g. a vague, ungrounded answer instead of a full
+    non-answer), the net is pushed back by `grace` turns so an in-progress
+    follow-up thread isn't cut off mid-exchange. A user who never engages at
+    all is still capped at the original threshold.
+
+    `grace` defaults to 4 turns. The per-stage session time limit
+    (`settings.max_session_minutes`, 24h by default) makes the extra wall-clock
+    cost a non-issue, so the grace is sized for genuinely patient follow-up
+    rather than the tighter margin a wall-clock constraint would otherwise
+    force — the remaining cost is turn-count variance across conditions and
+    diminishing returns on a participant who truly has nothing more specific
+    to add, not session runaway.
+    """
+
+    def predicate(s: dict, n: int) -> bool:
+        if bool(s.get(signal_key)) and n >= floor:
+            return True
+        if attempted_key and bool(s.get(attempted_key)):
+            return n >= cap + grace
+        return n >= cap
+
+    return predicate
+
+
 _TRANSITIONS: dict[str, list[tuple[Stage, Stage, Predicate]]] = {
     "common_identity": [
         # n>=2 floor / n>=4 cap: spend at least 2 turns on feeling before advancing.
         (Stage.STAGE_1, Stage.STAGE_2,
-         lambda s, n: (bool(s.get("feeling_expressed")) and n >= 2) or n >= 4),
-        # n>=3 floor / n>=5 cap: spend at least 3 turns on media distortion before advancing.
+         _gated("feeling_expressed", floor=2, cap=4)),
+        # n>=3 floor / n>=5 cap (n>=9 if the user is genuinely engaging with the
+        # media-distortion follow-up but hasn't nailed it yet).
         (Stage.STAGE_2, Stage.STAGE_3,
-         lambda s, n: (bool(s.get("media_distortion_acknowledged")) and n >= 3) or n >= 5),
-        # n>=2 floor / n>=4 cap: spend at least 2 turns on common identity before advancing.
+         _gated("media_distortion_acknowledged", floor=3, cap=5,
+                attempted_key="media_distortion_attempted")),
+        # n>=2 floor / n>=4 cap (n>=8 with a genuine partial attempt).
         (Stage.STAGE_3, Stage.STAGE_4,
-         lambda s, n: (bool(s.get("common_identity_described")) and n >= 2) or n >= 4),
+         _gated("common_identity_described", floor=2, cap=4,
+                attempted_key="common_identity_attempted")),
         # n>=2 floor: match control S4 minimum; total min = 2+3+2+2 = 9.
         (Stage.STAGE_4, Stage.COMPLETE, lambda s, n: n >= 2),
     ],
@@ -57,12 +98,16 @@ _TRANSITIONS: dict[str, list[tuple[Stage, Stage, Predicate]]] = {
         # n>=3 floor / n>=6 cap: spend at least 3 turns gathering detail.
         (Stage.STAGE_2, Stage.STAGE_3,
          lambda s, n: (s.get("person_details_count", 0) >= 2 and n >= 3) or n >= 6),
-        # n>=2 floor / n>=5 cap: spend at least 2 turns on origins.
+        # n>=2 floor / n>=5 cap (n>=9 with a genuine partial attempt at origins).
         (Stage.STAGE_3, Stage.STAGE_4,
-         lambda s, n: (bool(s.get("origins_explored")) and n >= 2) or n >= 5),
-        # n>=2 floor on signal path / n>=6 cap; total min = 2+3+2+2 = 9.
+         _gated("origins_explored", floor=2, cap=5,
+                attempted_key="origins_attempted")),
+        # n>=2 floor on signal path / n>=6 cap (n>=10 if the user has engaged the
+        # typical/exception sub-question but the final reflection is still
+        # pending); total min = 2+3+2+2 = 9.
         (Stage.STAGE_4, Stage.COMPLETE,
-         lambda s, n: (bool(s.get("generalization_reflected")) and n >= 2) or n >= 6),
+         _gated("generalization_reflected", floor=2, cap=6,
+                attempted_key="typical_exception_addressed")),
     ],
     "misperception_correction": [
         (Stage.STAGE_1, Stage.STAGE_2, lambda s, n: n >= 1),
