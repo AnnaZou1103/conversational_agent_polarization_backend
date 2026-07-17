@@ -33,6 +33,10 @@ class AnthropicProvider(LLMProvider):
             }
         ]
 
+    @staticmethod
+    def _is_temperature_deprecated_error(e: anthropic.BadRequestError) -> bool:
+        return "temperature" in str(e) and "deprecated" in str(e)
+
     async def complete(
         self,
         messages: list[Message],
@@ -49,8 +53,20 @@ class AnthropicProvider(LLMProvider):
         if system:
             kwargs["system"] = self._system_param(system)
 
-        response = await self.client.messages.create(**kwargs)
-        return response.content[0].text
+        try:
+            response = await self.client.messages.create(**kwargs)
+        except anthropic.BadRequestError as e:
+            # Some newer models (e.g. claude-sonnet-5) reject any non-default
+            # temperature outright. Retry without it rather than hardcoding a
+            # model allowlist.
+            if not self._is_temperature_deprecated_error(e):
+                raise
+            kwargs.pop("temperature")
+            response = await self.client.messages.create(**kwargs)
+
+        # The model can spontaneously prepend a ThinkingBlock even without
+        # extended thinking configured, so content[0] isn't reliably text.
+        return next(b.text for b in response.content if b.type == "text")
 
     async def stream(
         self,
@@ -68,6 +84,14 @@ class AnthropicProvider(LLMProvider):
         if system:
             kwargs["system"] = self._system_param(system)
 
-        async with self.client.messages.stream(**kwargs) as stream:
-            async for text in stream.text_stream:
-                yield text
+        try:
+            async with self.client.messages.stream(**kwargs) as stream:
+                async for text in stream.text_stream:
+                    yield text
+        except anthropic.BadRequestError as e:
+            if not self._is_temperature_deprecated_error(e):
+                raise
+            kwargs.pop("temperature")
+            async with self.client.messages.stream(**kwargs) as stream:
+                async for text in stream.text_stream:
+                    yield text
