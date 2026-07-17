@@ -34,6 +34,19 @@ PRE_SURVEY_ORDER = [
 # revise participant-facing task copy, and expand post-survey questions" in
 # conversational_agent_polarization) — kept so those older records still
 # sort into a sensible position instead of falling to the end.
+#
+# sendThreateningMessages/publicHarass/violenceForGoals/violenceForElection
+# (the old "Political Violence" page) were replaced by the "Opposition to
+# Bipartisanship & Social Distance" page (bipartisanRepsCooperation etc.) —
+# kept here for the same reason.
+#
+# maeChangingViews/maeHiddenAgenda/maeHonestIntentions/maeWillingToDiscuss/
+# maeMoreOpen/maeMoreConversations were replaced by maePersuasionAcceptable/
+# maeUnwantedManipulation/maeAnnoyedControl/maeApproachOkay/maeFair — kept
+# here for the same reason.
+#
+# oqImprove ("how could we improve the AI agent?") was replaced by
+# oqAttitudeChangeOthersWhy — kept here for the same reason.
 POST_SURVEY_ORDER = [
     "emotionEnthusiastic",
     "emotionHappy",
@@ -56,6 +69,10 @@ POST_SURVEY_ORDER = [
     "publicHarass",
     "violenceForGoals",
     "violenceForElection",
+    "bipartisanRepsCooperation",
+    "bipartisanCompromiseCooperation",
+    "comfortFriendsOutgroup",
+    "comfortNeighborsOutgroup",
     "ceEasyToUnderstand",
     "ceClearCommunication",
     "ceKeptContext",
@@ -81,6 +98,11 @@ POST_SURVEY_ORDER = [
     "maeWillingToDiscuss",
     "maeMoreOpen",
     "maeMoreConversations",
+    "maePersuasionAcceptable",
+    "maeUnwantedManipulation",
+    "maeAnnoyedControl",
+    "maeApproachOkay",
+    "maeFair",
     "weWillingFuture",
     "oqWillingFutureWhy",
     "saSatisfiedOverall",
@@ -90,6 +112,7 @@ POST_SURVEY_ORDER = [
     "oqAttitudeChangeSelfWhy",
     "attitudeChangeOthers",
     "oqImprove",
+    "oqAttitudeChangeOthersWhy",
 ]
 
 
