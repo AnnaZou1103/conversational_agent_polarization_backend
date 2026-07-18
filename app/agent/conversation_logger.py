@@ -10,6 +10,34 @@ from app.llm.base import Message
 
 logger = logging.getLogger(__name__)
 
+# Signal keys that are ever surfaced to the participant, directly or via the
+# /observation endpoint's *Observation schemas (see app/db/conversation.py
+# _get_*_observation helpers). Everything else in state.signals is internal
+# stage-gating bookkeeping (see app/agent/phases.py) and research-analysis
+# data never shown in the UI. Kept as a separate constant so
+# visible_signals can be trimmed without touching the full `signals` field,
+# which build_session_state() must read back unchanged to keep stage
+# transitions working across stateless requests.
+VISIBLE_SIGNAL_KEYS = {
+    "exhausted_majority_introduced",  # -> CIObservation.show_survey
+    "user_feeling_text",
+    "user_media_text",
+    "person_label",
+    "person_traits",
+    "person_cares_about",
+    "person_memories",
+    "person_political_origin",
+    "topics_shared",
+    "current_mood",
+    "main_takeaway",
+    "main_concern",
+    "question_answers",
+}
+
+
+def _filter_visible_signals(signals: dict) -> dict:
+    return {k: v for k, v in signals.items() if k in VISIBLE_SIGNAL_KEYS}
+
 
 def log_safety_event(
     conversations_dir: str,
@@ -64,6 +92,7 @@ def log_turn(
             ]
             + [{"role": "assistant", "content": response, "timestamp": now_iso}],
             "signals": dict(state.signals),
+            "visible_signals": _filter_visible_signals(state.signals),
         }
 
         study_id = state.metadata.get("study_id") or state.study_id
