@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from app.agent.survey_data import COMMON_IDENTITY_DATA_CARD, QUIZ_QUESTIONS
+from app.agent.survey_data import QUIZ_QUESTIONS
 from app.schema import (
     Message,
     CIObservation,
@@ -82,15 +82,13 @@ def get_chat_history(study_id: str) -> list:
 
 
 def _get_common_identity_observation(signals: dict) -> CIObservation:
-    show_survey = bool(signals.get("exhausted_majority_introduced"))
-    survey_text = COMMON_IDENTITY_DATA_CARD
     user_feeling_text = signals.get("user_feeling_text")
     user_media_text = signals.get("user_media_text")
+    additional_common_ground_text = signals.get("additional_common_ground_text")
     return CIObservation(
-        show_survey=show_survey,
-        survey_text=survey_text,
         user_feeling_text=user_feeling_text,
         user_media_text=user_media_text,
+        additional_common_ground_text=additional_common_ground_text,
     )
 
 

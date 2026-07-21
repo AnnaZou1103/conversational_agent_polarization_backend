@@ -133,10 +133,9 @@ class ChatCompletionRequest(CaseModel):
 
 
 class CIObservation(CaseModel):
-    show_survey: bool
-    survey_text: str
     user_feeling_text: Optional[str] = None
     user_media_text: Optional[str] = None
+    additional_common_ground_text: Optional[str] = None
 
 
 class PNObservation(CaseModel):
