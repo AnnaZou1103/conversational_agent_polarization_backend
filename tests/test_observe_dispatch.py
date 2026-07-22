@@ -126,9 +126,9 @@ def test_dispatch_control_uses_topics_schema() -> None:
 
 def test_dispatch_misperception_uses_quiz_schema() -> None:
     state = _state("misperception_correction")
-    mock = _observe(state, [json.dumps({"intro_completed": True})], ["yes let's go"])
+    mock = _observe(state, [json.dumps({"questions_answered": 0})], ["yes let's go"])
     prompt = mock.complete_calls[0]
-    assert '"intro_completed"' in prompt
+    assert '"mid_quiz_reflection_done"' in prompt
     assert '"questions_answered"' in prompt
     assert '"person_label"' not in prompt
 

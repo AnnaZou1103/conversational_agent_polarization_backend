@@ -75,7 +75,7 @@ def run():
     entry3 = make_entry(3, "stage_2", {
         "feeling_expressed": True,
         "user_feeling_text": "frustrated",
-        "media_mentioned": True,
+        "media_distortion_attempted": True,
         "user_media_text": "cable news and Twitter",
     }, msgs_t3)
     save_turn_log(STUDY_ID, entry3)
@@ -131,8 +131,8 @@ def run():
         str(signal_history[1].get("signals") if len(signal_history) > 1 else "missing"),
     )
     failures += not check(
-        "signal_history[2] has media_mentioned=True (accumulated)",
-        signal_history[2].get("signals", {}).get("media_mentioned") is True,
+        "signal_history[2] has media_distortion_attempted=True (accumulated)",
+        signal_history[2].get("signals", {}).get("media_distortion_attempted") is True,
         str(signal_history[2].get("signals") if len(signal_history) > 2 else "missing"),
     )
     failures += not check(
