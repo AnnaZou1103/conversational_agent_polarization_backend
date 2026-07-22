@@ -19,9 +19,9 @@ logger = logging.getLogger(__name__)
 # which build_session_state() must read back unchanged to keep stage
 # transitions working across stateless requests.
 VISIBLE_SIGNAL_KEYS = {
-    "exhausted_majority_introduced",  # -> CIObservation.show_survey
     "user_feeling_text",
     "user_media_text",
+    "additional_common_ground_text",
     "person_label",
     "person_traits",
     "person_cares_about",
