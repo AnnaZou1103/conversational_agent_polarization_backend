@@ -167,8 +167,8 @@ def run():
     )
     if obs:
         failures += not check(
-            "observation.show_survey is False (exhausted_majority_introduced not set)",
-            obs.observation.show_survey is False,
+            "observation.user_feeling_text is None (not set)",
+            obs.observation.user_feeling_text is None,
             str(obs.observation),
         )
 

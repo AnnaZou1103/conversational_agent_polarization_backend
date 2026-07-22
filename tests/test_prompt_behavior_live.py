@@ -276,13 +276,15 @@ def test_common_identity_s1_keeps_probing_at_turn_1() -> None:
 
 
 def test_common_identity_s4_wraps_at_turn_2() -> None:
-    """S4 at turn 2 (meeting the n>=2 floor) should feel like a natural close."""
+    """S4 once the optional common-ground extension has already been asked and
+    answered should move to the mandatory closing reflection; it should feel
+    like a natural close, not a hard goodbye."""
     llm = _make_llm()
     system = _system("common_identity", Stage.STAGE_4, turn=2)
     messages = [
         {"role": "assistant", "content": (
-            "It sounds like, beneath the political labels, there's something you share "
-            "with the people you disagree with. What do you think that common ground is?"
+            "Beyond that shared exhaustion, is there anything else you'd say "
+            "connects you to people on the other side — even something small?"
         )},
         {"role": "user", "content": (
             "I guess we all just want the country to be stable and safe, "

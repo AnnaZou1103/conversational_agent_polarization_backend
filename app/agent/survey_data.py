@@ -2,9 +2,11 @@
 Survey findings and data card content for study conditions.
 
 COMMON_IDENTITY_DATA_CARD
-  Text shown to participants in the common_identity condition after the
-  exhausted majority concept has been introduced. Replace with the exact
-  survey citation when final data is available.
+  Survey finding the agent may share in-conversation during Stage 3 of the
+  common_identity condition, as a fallback if the participant doubts or
+  denies that others feel similarly worn out by political division (see
+  app/agent/prompts.py, STAGE_PROMPTS[Strategy.COMMON_IDENTITY][Stage.STAGE_3]).
+  Replace with the exact survey citation when final data is available.
 """
 
 # Placeholder — replace with actual survey citation and wording when available

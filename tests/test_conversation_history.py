@@ -154,7 +154,10 @@ def test_get_chat_history_empty_when_no_payload():
 # ---------------------------------------------------------------------------
 
 def test_get_conversation_observation_reads_payload_signals():
-    signals = {"feeling_expressed": True, "exhausted_majority_introduced": True}
+    signals = {
+        "feeling_expressed": True,
+        "user_feeling_text": "frustrated by the constant division",
+    }
     doc = {"study_id": "sid1", "payload": _entry(strategy="common_identity", signals=signals)}
 
     with patch("app.db.conversation.conversation_docs") as mock_col:
@@ -162,7 +165,7 @@ def test_get_conversation_observation_reads_payload_signals():
         obs = get_conversation_observation("sid1")
 
     assert obs is not None
-    assert obs.observation.show_survey is True
+    assert obs.observation.user_feeling_text == "frustrated by the constant division"
 
 
 def test_get_conversation_observation_none_when_no_payload():

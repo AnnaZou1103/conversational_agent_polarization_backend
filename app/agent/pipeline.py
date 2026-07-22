@@ -196,6 +196,23 @@ class AgentPipeline:
             )
             extracted = json.loads(_extract_json_object(response))
 
+            # generalization_reflected requires the typical/exception
+            # sub-question to already be resolved from a PRIOR turn — Stage 4
+            # only asks the closing "shift how you see" question after that
+            # sub-question is answered, so a message that trips both signals
+            # in the same turn means the user was answering the typical/
+            # exception question, not the actual closing question. OBSERVE
+            # (an LLM) doesn't reliably enforce this ordering on its own, so
+            # gate on already-established state here instead of trusting the
+            # model to detect the closing question's exact wording — this
+            # holds regardless of how that question is phrased.
+            if (
+                Strategy(state.strategy) == Strategy.PERSONAL_NARRATIVE
+                and extracted.get("generalization_reflected")
+                and not state.signals.get("typical_exception_addressed")
+            ):
+                extracted["generalization_reflected"] = False
+
             # Merge extracted signals into state. Never overwrite existing data
             # with an empty/falsy value — the model occasionally drops a field
             # it previously populated, and for lists we want to accumulate.

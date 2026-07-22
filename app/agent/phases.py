@@ -88,8 +88,17 @@ _TRANSITIONS: dict[str, list[tuple[Stage, Stage, Predicate]]] = {
         (Stage.STAGE_3, Stage.STAGE_4,
          _gated("common_identity_described", floor=2, cap=4,
                 attempted_key="common_identity_attempted")),
-        # n>=2 floor: match control S4 minimum; total min = 2+3+2+2 = 9.
-        (Stage.STAGE_4, Stage.COMPLETE, lambda s, n: n >= 2),
+        # Signal-gated on the mandatory closing question's phrase fingerprint
+        # (see closing_reflection_answered), not a fixed turn count: Stage 4
+        # first spends a variable 1-2 turns on the optional common-ground
+        # extension (open question, plus one nudge with examples only if the
+        # user drew a blank) before the mandatory closing question is asked, so
+        # a fixed count can't tell "extension answered" from "closing question
+        # answered" apart. n>=6 is a pure safety net for a stalled/non-standard
+        # exchange, well above the ~4-turn expected max (open Q, nudge,
+        # mandatory Q, answer).
+        (Stage.STAGE_4, Stage.COMPLETE,
+         lambda s, n: bool(s.get("closing_reflection_answered")) or n >= 6),
     ],
     "personal_narrative": [
         # n>=2 floor / n>=4 cap: spend at least 2 turns identifying the person.

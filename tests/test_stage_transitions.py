@@ -68,7 +68,24 @@ def test_common_identity_full_path() -> None:
                   {"common_identity_described": True})
     assert s.stage == Stage.STAGE_4
 
-    s = _evaluate("common_identity", Stage.STAGE_4, 2, {})
+    s = _evaluate("common_identity", Stage.STAGE_4, 3,
+                  {"closing_reflection_answered": True})
+    assert s.stage == Stage.COMPLETE
+
+
+def test_common_identity_s4_waits_for_closing_signal() -> None:
+    # No signal, below the n>=6 safety net -> stays in S4 (still resolving the
+    # optional extension / nudge, or the closing question hasn't been asked).
+    s = _evaluate("common_identity", Stage.STAGE_4, 5, {})
+    assert s.stage == Stage.STAGE_4
+
+    # Safety net fires regardless of signal once n>=6.
+    s = _evaluate("common_identity", Stage.STAGE_4, 6, {})
+    assert s.stage == Stage.COMPLETE
+
+    # Signal true advances well before the safety net.
+    s = _evaluate("common_identity", Stage.STAGE_4, 2,
+                  {"closing_reflection_answered": True})
     assert s.stage == Stage.COMPLETE
 
 
