@@ -116,10 +116,17 @@ def test_personal_narrative_uses_person_label_not_person_name() -> None:
 
 
 def test_personal_narrative_details_and_origins() -> None:
+    # Detail count alone, without the "why" answer, is not enough.
     s = _evaluate("personal_narrative", Stage.STAGE_2, 3, {"person_details_count": 2})
+    assert s.stage == Stage.STAGE_2
+
+    # Both the "why" answer and the detail count, at/above floor -> advance.
+    s = _evaluate("personal_narrative", Stage.STAGE_2, 3,
+                  {"why_liked_respected": True, "person_details_count": 2})
     assert s.stage == Stage.STAGE_3
 
-    s = _evaluate("personal_narrative", Stage.STAGE_2, 3, {"person_details_count": 1})
+    s = _evaluate("personal_narrative", Stage.STAGE_2, 3,
+                  {"why_liked_respected": True, "person_details_count": 1})
     assert s.stage == Stage.STAGE_2  # below detail threshold
 
     s = _evaluate("personal_narrative", Stage.STAGE_3, 2, {"origins_explored": True})
@@ -127,9 +134,15 @@ def test_personal_narrative_details_and_origins() -> None:
 
 
 def test_personal_narrative_s4_generalization() -> None:
-    # Signal fires at/above floor (n>=2) -> advance.
-    s = _evaluate("personal_narrative", Stage.STAGE_4, 2, {"generalization_reflected": True})
+    # Both mandatory follow-ups answered, at/above floor (n>=2) -> advance.
+    s = _evaluate("personal_narrative", Stage.STAGE_4, 2,
+                  {"generalization_reflected": True, "community_reflected": True})
     assert s.stage == Stage.COMPLETE
+
+    # Only the first of the two mandatory follow-ups answered -> stay (the
+    # community question still needs to be asked and answered).
+    s = _evaluate("personal_narrative", Stage.STAGE_4, 2, {"generalization_reflected": True})
+    assert s.stage == Stage.STAGE_4
 
     # No signal AND below safety-net cap (n=5 < 6) -> stay.
     s = _evaluate("personal_narrative", Stage.STAGE_4, 5, {})
@@ -429,8 +442,9 @@ def test_personal_narrative_always_completes_without_signals() -> None:
 
 
 def test_personal_narrative_s4_signal_still_wins_before_cap() -> None:
-    # generalization_reflected advances at/above floor (n>=2), before the cap (n>=6)
-    s = _evaluate("personal_narrative", Stage.STAGE_4, 2, {"generalization_reflected": True})
+    # Both mandatory signals advance at/above floor (n>=2), before the cap (n>=6)
+    s = _evaluate("personal_narrative", Stage.STAGE_4, 2,
+                  {"generalization_reflected": True, "community_reflected": True})
     assert s.stage == Stage.COMPLETE
 
 

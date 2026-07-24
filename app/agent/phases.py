@@ -74,6 +74,42 @@ def _gated(
     return predicate
 
 
+def _pn_stage2_complete(s: dict, n: int) -> bool:
+    """personal_narrative Stage 2 -> Stage 3: requires a real answer to the
+    "why do you like/respect them" question (the stage's most important
+    question per the prompt) in addition to the general detail count, not
+    just the detail count alone — otherwise the stage could complete from
+    the other three questions without that one ever landing.
+    """
+    if (
+        bool(s.get("why_liked_respected"))
+        and s.get("person_details_count", 0) >= 2
+        and n >= 3
+    ):
+        return True
+    return n >= 6
+
+
+def _pn_stage4_complete(s: dict, n: int) -> bool:
+    """personal_narrative Stage 4 -> COMPLETE: requires both mandatory
+    follow-ups (empathy/"shift how you see", then the community-membership
+    question), not just the first. Same floor/cap/grace shape as `_gated`,
+    but the "attempted" fallback also counts having cleared the first
+    question alone, since that's real, if partial, engagement in this stage.
+    """
+    both_answered = bool(s.get("generalization_reflected")) and bool(
+        s.get("community_reflected")
+    )
+    if both_answered and n >= 2:
+        return True
+    attempted = bool(s.get("typical_exception_addressed")) or bool(
+        s.get("generalization_reflected")
+    )
+    if attempted:
+        return n >= 10
+    return n >= 6
+
+
 _TRANSITIONS: dict[str, list[tuple[Stage, Stage, Predicate]]] = {
     "common_identity": [
         # n>=2 floor / n>=4 cap: spend at least 2 turns on feeling before advancing.
@@ -104,19 +140,22 @@ _TRANSITIONS: dict[str, list[tuple[Stage, Stage, Predicate]]] = {
         # n>=2 floor / n>=4 cap: spend at least 2 turns identifying the person.
         (Stage.STAGE_1, Stage.STAGE_2,
          lambda s, n: (s.get("person_label") is not None and n >= 2) or n >= 4),
-        # n>=3 floor / n>=6 cap: spend at least 3 turns gathering detail.
-        (Stage.STAGE_2, Stage.STAGE_3,
-         lambda s, n: (s.get("person_details_count", 0) >= 2 and n >= 3) or n >= 6),
+        # n>=3 floor / n>=6 cap: spend at least 3 turns gathering detail, and
+        # the floor path additionally requires a real answer to the "why do
+        # you like/respect them" question, not just any 2 details.
+        (Stage.STAGE_2, Stage.STAGE_3, _pn_stage2_complete),
         # n>=2 floor / n>=5 cap (n>=9 with a genuine partial attempt at origins).
         (Stage.STAGE_3, Stage.STAGE_4,
          _gated("origins_explored", floor=2, cap=5,
                 attempted_key="origins_attempted")),
-        # n>=2 floor on signal path / n>=6 cap (n>=10 if the user has engaged the
-        # typical/exception sub-question but the final reflection is still
-        # pending); total min = 2+3+2+2 = 9.
-        (Stage.STAGE_4, Stage.COMPLETE,
-         _gated("generalization_reflected", floor=2, cap=6,
-                attempted_key="typical_exception_addressed")),
+        # Stage 4 now asks two mandatory follow-ups in sequence (the empathy/
+        # "shift how you see" question, then the community-membership
+        # question), so completion requires both signals rather than a single
+        # gate. n>=2 floor once both are answered; n>=10 cap if the user has
+        # engaged at least the typical/exception sub-question or already
+        # answered the first mandatory question but the second is still
+        # pending; n>=6 cap otherwise.
+        (Stage.STAGE_4, Stage.COMPLETE, _pn_stage4_complete),
     ],
     "misperception_correction": [
         (Stage.STAGE_1, Stage.STAGE_2, lambda s, n: n >= 1),
