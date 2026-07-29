@@ -47,6 +47,10 @@ PRE_SURVEY_ORDER = [
 #
 # oqImprove ("how could we improve the AI agent?") was replaced by
 # oqAttitudeChangeOthersWhy — kept here for the same reason.
+#
+# attitudeChangeOthers (a single "how would this change other people?" rating)
+# was split into attitudeChangeInParty (rating) + oqAttitudeChangeOutParty
+# (open-ended) — kept here for the same reason.
 POST_SURVEY_ORDER = [
     "emotionEnthusiastic",
     "emotionHappy",
@@ -111,6 +115,8 @@ POST_SURVEY_ORDER = [
     "attitudeChangeSelf",
     "oqAttitudeChangeSelfWhy",
     "attitudeChangeOthers",
+    "attitudeChangeInParty",
+    "oqAttitudeChangeOutParty",
     "oqImprove",
     "oqAttitudeChangeOthersWhy",
 ]

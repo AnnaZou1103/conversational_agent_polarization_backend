@@ -70,9 +70,25 @@ def test_post_survey_order_covers_renamed_and_legacy_thermometer_keys():
 def test_post_survey_order_covers_attitude_change_split():
     # oqAttitudeChange (legacy single field) was split into a rating +
     # open-ended pair, plus a new attitudeChangeOthers rating.
-    for key in ("oqAttitudeChange", "attitudeChangeSelf", "oqAttitudeChangeSelfWhy", "attitudeChangeOthers"):
+    # attitudeChangeOthers (legacy rating) was later split into
+    # attitudeChangeInParty (rating) + oqAttitudeChangeOutParty (open-ended),
+    # followed by oqAttitudeChangeOthersWhy (open-ended).
+    for key in (
+        "oqAttitudeChange",
+        "attitudeChangeSelf",
+        "oqAttitudeChangeSelfWhy",
+        "attitudeChangeOthers",
+        "attitudeChangeInParty",
+        "oqAttitudeChangeOutParty",
+        "oqAttitudeChangeOthersWhy",
+    ):
         assert key in POST_SURVEY_ORDER
     assert POST_SURVEY_ORDER.index("attitudeChangeSelf") < POST_SURVEY_ORDER.index("oqImprove")
+    assert (
+        POST_SURVEY_ORDER.index("attitudeChangeInParty")
+        < POST_SURVEY_ORDER.index("oqAttitudeChangeOutParty")
+        < POST_SURVEY_ORDER.index("oqAttitudeChangeOthersWhy")
+    )
 
 
 @patch("app.db.survey.user_docs")
