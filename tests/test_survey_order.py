@@ -71,7 +71,7 @@ def test_post_survey_order_covers_attitude_change_split():
     # oqAttitudeChange (legacy single field) was split into a rating +
     # open-ended pair, plus a new attitudeChangeOthers rating.
     # attitudeChangeOthers (legacy rating) was later split into
-    # attitudeChangeInParty (rating) + oqAttitudeChangeOutParty (open-ended),
+    # attitudeChangeInParty + attitudeChangeOutParty (both ratings),
     # followed by oqAttitudeChangeOthersWhy (open-ended).
     for key in (
         "oqAttitudeChange",
@@ -79,14 +79,14 @@ def test_post_survey_order_covers_attitude_change_split():
         "oqAttitudeChangeSelfWhy",
         "attitudeChangeOthers",
         "attitudeChangeInParty",
-        "oqAttitudeChangeOutParty",
+        "attitudeChangeOutParty",
         "oqAttitudeChangeOthersWhy",
     ):
         assert key in POST_SURVEY_ORDER
     assert POST_SURVEY_ORDER.index("attitudeChangeSelf") < POST_SURVEY_ORDER.index("oqImprove")
     assert (
         POST_SURVEY_ORDER.index("attitudeChangeInParty")
-        < POST_SURVEY_ORDER.index("oqAttitudeChangeOutParty")
+        < POST_SURVEY_ORDER.index("attitudeChangeOutParty")
         < POST_SURVEY_ORDER.index("oqAttitudeChangeOthersWhy")
     )
 

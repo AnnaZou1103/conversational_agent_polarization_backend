@@ -49,8 +49,8 @@ PRE_SURVEY_ORDER = [
 # oqAttitudeChangeOthersWhy — kept here for the same reason.
 #
 # attitudeChangeOthers (a single "how would this change other people?" rating)
-# was split into attitudeChangeInParty (rating) + oqAttitudeChangeOutParty
-# (open-ended) — kept here for the same reason.
+# was split into attitudeChangeInParty + attitudeChangeOutParty (both ratings)
+# — kept here for the same reason.
 POST_SURVEY_ORDER = [
     "emotionEnthusiastic",
     "emotionHappy",
@@ -116,7 +116,7 @@ POST_SURVEY_ORDER = [
     "oqAttitudeChangeSelfWhy",
     "attitudeChangeOthers",
     "attitudeChangeInParty",
-    "oqAttitudeChangeOutParty",
+    "attitudeChangeOutParty",
     "oqImprove",
     "oqAttitudeChangeOthersWhy",
 ]
