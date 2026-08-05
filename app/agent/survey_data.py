@@ -79,3 +79,31 @@ QUIZ_QUESTIONS: list[dict] = [
         "survey_average": "Most {party} supporters would never support this action.",
     },
 ]
+
+
+# Numeric survey answer per question on the 1–4 Likert scale, derived from each
+# survey_average sentence so the sentence stays the single source of truth
+# (never→1, probably not→2, probably→3, definitely→4). Used to compute the
+# aggregate survey mean, which the misperception_correction pipeline compares
+# against the participant's own mean estimate to classify their response
+# pattern for the Stage 3 reflection (see app/agent/pipeline.py).
+_LIKERT_FROM_TEXT: tuple[tuple[str, int], ...] = (
+    ("would definitely", 4),
+    ("would probably not", 2),  # must precede "would probably"
+    ("would probably", 3),
+    ("would never", 1),
+)
+
+
+def _survey_value(sentence: str) -> int:
+    lowered = sentence.lower()
+    for phrase, value in _LIKERT_FROM_TEXT:
+        if phrase in lowered:
+            return value
+    raise ValueError(f"Cannot derive survey value from sentence: {sentence!r}")
+
+
+SURVEY_VALUES: dict[str, int] = {
+    q["id"]: _survey_value(q["survey_average"]) for q in QUIZ_QUESTIONS
+}
+SURVEY_AVERAGE: float = sum(SURVEY_VALUES.values()) / len(SURVEY_VALUES)

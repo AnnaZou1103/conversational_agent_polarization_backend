@@ -461,28 +461,36 @@ Rules for this stage:
 - Keep your tone neutral and curious throughout. You are not celebrating or scoring the user.""",
         Stage.STAGE_3: """Stage 3 — Reflection.
 
-All 8 questions have been answered. Now invite the user to reflect specifically on the gap between what they expected and what surveys actually found.
+All 8 questions have been answered. Now invite the user to reflect on how their own estimates compared with what the surveys actually found.
 
-Open with a question along these lines, in your own words — something like:
-"That's all 8 questions. Looking at the full picture — how does the gap between what you expected and what surveys actually found sit with you?"
+The `response_pattern` signal in the Session Context has ALREADY been computed in code by comparing the participant's own average estimate against the survey average — do NOT recompute it, and do NOT assume a direction yourself. Open by stating the one factual clause that matches `response_pattern`, neutrally and only once, then ask the shared reflection question below:
+- "overestimated": "That's all 8 questions. Looking across all eight, your estimates were generally higher than what the surveys actually found."
+- "close": "That's all 8 questions. Looking across all eight, your estimates were fairly close to what the surveys actually found."
+- "underestimated": "That's all 8 questions. Looking across all eight, your estimates were generally lower than what the surveys actually found."
+If `response_pattern` is missing for any reason, open without any direction claim — just note they have now seen all eight results.
+
+Then ask the SAME reflection question regardless of which clause you used, in your own words — something like:
+"What stands out to you about how your estimates lined up with the results?"
 
 Then:
 - Let the user respond fully. Reflect back using their own words.
-- If the user's response to the opening reflection question is not substantive — single words, evaluative words like "interesting" or "unfair," short phrases that don't explain why, short sentences that only label a reaction without explaining it ("That is surprising," "That seems off," "That makes sense," "That is not what I expected") — do NOT move to the follow-up. Keep asking on every turn until they share a full sentence with a real reaction that explains their impression. e.g.: "Your honest reaction is exactly what this part of the study is for — even something like 'I'm surprised' or 'it confirmed what I thought' is a great starting point."
-- If the user's response to the opening reflection question is substantive but thin — one brief sentence that gives a real impression but no texture (e.g., "It surprised me more than I expected," "It confirmed what I already thought") — ask one follow-up to draw out more before moving on: e.g., "What part of the picture surprised you most?" or "Did seeing the full set of results push your sense of [opposing party] supporters in any direction?"
-- Ask one follow-up, in your own words — something like: "Was there a particular question where the difference between your guess and the survey result stood out most? What do you make of that?"
-- If the user's response to the follow-up is not substantive — a single word, an evaluative label ("interesting," "unfair"), "all of them" or "none" without any elaboration, short sentences that only name a reaction without explaining it ("That one stood out," "That was the most surprising") — keep asking on every turn until they name a specific question and say something real about it. e.g.: "Even a rough sense of which one stuck with you, and why, would be really valuable here."
-- If the user's response to the follow-up is substantive but thin — names a question and gives a brief genuine reaction but no elaboration (e.g., "The abortion one — I didn't expect that") — ask one more follow-up for texture: e.g., "What do you think that gap tells you about how [opposing party] supporters actually view that issue?" Only move on after they have said something real about why it stood out.
+- The factual clause above is fixed by `response_pattern`; state it plainly but do not pile on, do not editorialize beyond it, and do not steer the user toward saying their view shifted. A close-match or overestimate pattern are equally valid outcomes.
+- If the user's response to the opening reflection question is not substantive — single words, evaluative words like "interesting" or "unfair," short phrases that don't explain why, short sentences that only label a reaction without explaining it ("That is surprising," "That seems off," "That makes sense," "That is about what I expected") — do NOT move to the follow-up. Keep asking on every turn until they share a full sentence with a real impression that explains it. e.g.: "Your honest reaction is exactly what this part of the study is for — even something like 'I'm surprised' or 'it was close to what I thought' is a great starting point."
+- If the user's response to the opening reflection question is substantive but thin — one brief sentence that gives a real impression but no texture (e.g., "It was closer than I thought," "It confirmed what I already thought," "A few were off") — ask one follow-up to draw out more before moving on: e.g., "What part of the picture stood out to you most?"
+- Ask one follow-up, in your own words — something like: "Was there a particular question that stuck with you — whether because your estimate was off, because it matched what you expected, or for any other reason? What do you make of it?"
+- If the user's response to the follow-up is not substantive — a single word, an evaluative label ("interesting," "unfair"), "all of them" or "none" without any elaboration, short sentences that only name a reaction without explaining it ("That one stood out," "That was the most surprising") — keep asking on every turn until they say something real, either about a specific question or about the overall pattern. They do NOT have to name a question where their estimate was wrong — an observation about where things matched, or about the pattern as a whole, counts just as much. e.g.: "Even a rough sense of what stuck with you, and why, would be really valuable here."
+- If the user's response to the follow-up is substantive but thin — points to a question or the overall pattern and gives a brief genuine reaction but no elaboration (e.g., "The abortion one — I didn't expect that," "They were mostly close to what I guessed") — ask one more follow-up for texture: e.g., "What do you think that tells you about how [opposing party] supporters actually view these issues?" Only move on after they have said something real about why it stood out.
 - Do not editorialize or draw the conclusion for them. Let the user articulate what was surprising or meaningful.
 - Do not moralize. Do not say things like "This shows we should all get along." """,
         Stage.STAGE_4: """You are in Stage 4: Close (1–2 turns).
 
-First, state the aggregate pattern once, in your own words — this is a permitted reveal, like the per-question ones, just at the summary level: "Across all eight questions, [opposing party] supporters overwhelmingly rejected the actions that would undermine democracy." Then ask: "Looking back at all 8 questions together — based on what you saw today, do you think the average [opposing party] supporter is more or less committed to democratic norms than you expected going in?"
+The aggregate finding — that [opposing party] supporters overwhelmingly rejected the actions that would undermine democracy — is delivered to the participant automatically the moment this stage begins, so do NOT restate it. Your task this turn is to ask, in your OWN words (not a fixed script), whether seeing how their guesses compared with the actual results changed how they see [opposing party] supporters' commitment to democratic norms. Build the question naturally off what they just said. Make clear that BOTH answers are equally valid — a genuine change OR that it mostly confirmed what they already thought — so a participant whose estimates were already accurate is never pushed to invent a change they did not experience. Ask this one question and nothing else; do not thank, summarize, or sign off. (For orientation only, do not copy verbatim: something to the effect of "did seeing how your guesses compared change how you see their commitment to democratic norms, or did it mostly line up with what you already thought?")
 
 Then:
 - Do not evaluate or add to what the user says.
-- If the user's response is not substantive — single words, evaluative labels ("interesting," "same," "unfair"), short phrases that name a reaction without explaining it, short sentences that only state a verdict without explaining why ("That changed things," "More committed than I thought," "About the same") — keep asking on every turn until they give at least one sentence with a genuine answer that explains why their view did or didn't change. e.g.: "Your honest take — even if it's just a rough impression — is exactly what this final question is for. Do you feel like your sense of where they stand shifted at all, or stayed about the same?"
-- If the user's response is substantive but thin — gives a genuine answer explaining their view but in a single brief sentence with no texture (e.g., "I think I see them as a bit more reasonable now," "Not really, I still feel the same way") — ask one follow-up to draw out more: e.g., "Is there a particular finding that moved the needle for you, or was it more the overall pattern?" or "What is it about how you came in that stayed the same?" Only move on after they have said something about why their view did or didn't shift.
+- A changed perception and a confirmed/unchanged one are equally valid, substantive answers — never imply the "right" answer is that their view changed. Accept "it shifted my view because…", "it mostly confirmed what I already thought because…", and reasoned skepticism alike.
+- If the user's response is not substantive — single words, evaluative labels ("interesting," "same," "unfair"), short phrases that name a reaction without explaining it, short sentences that only state a verdict without explaining why ("It changed my view," "Same as before," "They seem committed") — keep asking on every turn until they give at least one sentence explaining why it did or didn't change how they see the opposing party's commitment to democratic norms. e.g.: "Your honest take — even if it's just a rough impression — is exactly what this final question is for. Did seeing the results shift how you view where they stand on democratic norms, or did it mostly match what you already thought?"
+- If the user's response is substantive but thin — gives a genuine answer but in a single brief sentence with no texture (e.g., "Yeah it made them seem more reasonable," "No, pretty much what I expected") — ask one follow-up to draw out more: e.g., "Is there a particular finding behind that, or is it more the overall pattern?" Only move on after they have said something about what shaped their answer.
 - Do not thank-and-close or say goodbye yet — let the user respond first. The closing happens in the next step.""",
         Stage.COMPLETE: """The conversation is complete. If the user's last message was a request to end the conversation (e.g., "can we end", "let's stop", "I want to finish") rather than substantive content, skip the content acknowledgment and simply thank them warmly for participating in the study and let them know they can close the chat. Otherwise, briefly acknowledge what the user just shared — reference something specific from it so they know you heard them — then thank them warmly for their honest reflection, that it's exactly the kind of thoughtful engagement this study is designed to capture, and let them know they're all done and can close the chat whenever they're ready. Do not ask any question — this message is the closing message, not a turn to continue the conversation.""",
     },
@@ -767,3 +775,25 @@ def build_system_prompt(
         "[opposing wing]", _get_opposing_wing(state.political_party)
     )
     return full_prompt
+
+
+# Aggregate reveal emitted deterministically on the FIRST turn of the
+# misperception_correction Stage 4 (see AgentPipeline.process_turn). Real-LLM
+# testing showed the model reliably skips the Stage 4 opening on the transition
+# turn — it continues the Stage 3 reflection or wraps up. Only the reveal (the
+# core "the opposing party supports democratic norms" recognition) is fixed and
+# code-delivered; the perception-change question itself is left to the LLM to
+# phrase adaptively that same turn (the Stage 4 prompt handles it), so it isn't
+# a hard-coded script.
+_MISPERCEPTION_STAGE4_REVEAL = (
+    "Thanks for working through all of that with me. Stepping back for a moment: "
+    "across all eight questions, [opposing party] supporters overwhelmingly "
+    "rejected the actions that would undermine democracy."
+)
+
+
+def build_misperception_stage4_reveal(political_party: str | None) -> str:
+    """Resolve the fixed Stage 4 aggregate reveal with the participant's party."""
+    return _MISPERCEPTION_STAGE4_REVEAL.replace(
+        "[opposing party]", _get_opposing_party(political_party)
+    )

@@ -10,7 +10,13 @@ from datetime import datetime, timezone
 from app.agent.conversation_logger import log_safety_event, log_turn
 from app.agent.phases import StageController
 from app.agent.strategies import Strategy
-from app.agent.prompts import OBSERVE_PROMPTS, THINK_PROMPT, build_system_prompt
+from app.agent.survey_data import SURVEY_AVERAGE
+from app.agent.prompts import (
+    OBSERVE_PROMPTS,
+    THINK_PROMPT,
+    build_system_prompt,
+    build_misperception_stage4_reveal,
+)
 from app.agent.safety import (
     SafetyVerdict,
     CONSECUTIVE_REMINDER_LIMIT,
@@ -156,6 +162,7 @@ class AgentPipeline:
         state: SessionState,
         user_message: str,
         previous_assistant_message: str = "",
+        quiz_answer: int | None = None,
     ) -> None:
         """Analyze user message and update condition-specific signals."""
         prompt_template = OBSERVE_PROMPTS[Strategy(state.strategy)]
@@ -257,8 +264,50 @@ class AgentPipeline:
                 if isinstance(answers, dict):
                     valid_keys = {f"q{i}" for i in range(1, 9)}
                     answers = {k: v for k, v in answers.items() if k in valid_keys}
+
+                    # Prefer the exact value the participant clicked in the UI
+                    # (sent by the frontend) over the LLM's re-extraction from
+                    # free text. The slot comes from current_qid — derived
+                    # deterministically from the agent's "N of 8" prompt — so
+                    # neither the recorded value nor its slot depends on the
+                    # OBSERVE LLM. Falls back to the LLM extraction already in
+                    # `answers` when no valid click value is supplied (typed
+                    # answers, history replay).
+                    if (
+                        isinstance(quiz_answer, int)
+                        and 1 <= quiz_answer <= 4
+                        and current_qid in valid_keys
+                    ):
+                        answers[current_qid] = quiz_answer
+
                     state.signals["question_answers"] = answers
                     state.signals["questions_answered"] = len(answers)
+
+                    # Once all 8 estimates are recorded, classify how the
+                    # participant's estimates compared with the survey results,
+                    # deterministically in code rather than leaving the LLM to
+                    # compare eight pairs. Stage 3 reads response_pattern to
+                    # state one accurate factual clause, so it never assumes the
+                    # participant overestimated. Because the survey mean sits
+                    # near the floor (1.25 on the 1–4 scale), "underestimated"
+                    # is essentially unreachable — kept for completeness.
+                    if len(answers) == 8:
+                        try:
+                            user_vals = [int(answers[f"q{i}"]) for i in range(1, 9)]
+                        except (KeyError, TypeError, ValueError):
+                            user_vals = []
+                        if len(user_vals) == 8:
+                            user_avg = sum(user_vals) / 8
+                            diff = user_avg - SURVEY_AVERAGE
+                            if diff >= 0.5:
+                                pattern = "overestimated"
+                            elif diff <= -0.5:
+                                pattern = "underestimated"
+                            else:
+                                pattern = "close"
+                            state.signals["estimate_avg"] = round(user_avg, 2)
+                            state.signals["survey_avg"] = round(SURVEY_AVERAGE, 2)
+                            state.signals["response_pattern"] = pattern
 
             state.metadata["last_observation"] = extracted
 
@@ -352,6 +401,7 @@ class AgentPipeline:
         messages: list[dict],
         strategy_name: str,
         study_id: str,
+        quiz_answer: int | None = None,
     ) -> AsyncIterator[str | object]:
         """Process a single conversation turn through the pipeline.
 
@@ -372,6 +422,10 @@ class AgentPipeline:
         if state.stage == Stage.COMPLETE:
             yield COMPLETION_REENTRY_MESSAGE
             return
+
+        # Stage this turn started in, captured before evaluate_transition mutates
+        # state.stage — used to detect the FIRST turn of a new stage.
+        previous_stage = state.stage
 
         state.stage_turn_count += 1
 
@@ -489,11 +543,15 @@ class AgentPipeline:
         elif state.turn_count >= 1:
             if state.strategy in _OBSERVE_OFF_CRITICAL_PATH:
                 deferred_observe_task = asyncio.create_task(
-                    self._observe(state, user_message, previous_assistant_message)
+                    self._observe(
+                        state, user_message, previous_assistant_message, quiz_answer
+                    )
                 )
             else:
                 observe_task = asyncio.create_task(
-                    self._observe(state, user_message, previous_assistant_message)
+                    self._observe(
+                        state, user_message, previous_assistant_message, quiz_answer
+                    )
                 )
                 async for keep_alive in self._drive(observe_task):
                     yield keep_alive
@@ -506,6 +564,16 @@ class AgentPipeline:
             stage = stage_task.result()
         else:
             stage = state.stage
+
+        # First turn of misperception Stage 4: the aggregate reveal and the
+        # perception-change question (the study's DV) are emitted deterministically
+        # below instead of relying on the LLM, which reliably skips them on the
+        # transition turn.
+        first_stage4_turn = (
+            Strategy(state.strategy) == Strategy.MISPERCEPTION_CORRECTION
+            and previous_stage != Stage.STAGE_4
+            and stage == Stage.STAGE_4
+        )
 
         logger.info(
             "Session %s: condition=%s, stage=%s, stage_turn=%d, total_turn=%d",
@@ -522,7 +590,7 @@ class AgentPipeline:
         # --- THINK (optional) ---
         think_context = ""
 
-        if settings.enable_think and state.turn_count >= 1:
+        if settings.enable_think and state.turn_count >= 1 and not first_stage4_turn:
             think_task = asyncio.create_task(self._think(state, user_message))
             async for keep_alive in self._drive(think_task):
                 yield keep_alive
@@ -554,12 +622,35 @@ class AgentPipeline:
             llm_messages = [Message(role="user", content="Hello")]
 
         full_response = []
-        async for token in self.llm.stream(
-            messages=llm_messages,
-            system=system_prompt,
-        ):
-            full_response.append(token)
-            yield token
+        if first_stage4_turn:
+            # Deliver the aggregate reveal deterministically (the LLM skips it on
+            # the transition turn), then let the model phrase the perception-change
+            # question itself so it stays adaptive rather than a hard-coded script.
+            reveal = build_misperception_stage4_reveal(state.political_party)
+            reveal_block = reveal + "\n\n"
+            full_response.append(reveal_block)
+            yield reveal_block
+            dv_system = system_prompt + (
+                "\n\n## This turn only\n"
+                "The aggregate finding above has ALREADY been shown to the participant "
+                "this turn — do NOT restate it. Your entire reply is the single "
+                "perception-change question from the Stage 4 instructions, phrased in "
+                "your own words and built off what the participant just said. Ask only "
+                "that one question; do not thank, summarize, or sign off."
+            )
+            async for token in self.llm.stream(
+                messages=llm_messages,
+                system=dv_system,
+            ):
+                full_response.append(token)
+                yield token
+        else:
+            async for token in self.llm.stream(
+                messages=llm_messages,
+                system=system_prompt,
+            ):
+                full_response.append(token)
+                yield token
 
         # Await the deferred OBSERVE (control conditions) so this turn's signals
         # are captured by log_turn below. It ran concurrently with EXECUTE, so by
