@@ -165,7 +165,11 @@ Rules at all times:
 HUMAN_STYLE_RULES = (
     "Write like a real person, not a survey or chatbot: never use em or en dashes "
     '("—", "–") in your replies (use a comma, a period, or a new sentence instead), '
-    "use everyday contractions, and keep phrasing warm, plain, and unscripted."
+    "use everyday contractions, and keep phrasing warm, plain, and unscripted. "
+    "Ask real questions rather than reciting scripts: any example wordings in the "
+    "stage instructions are illustrations, not lines to read out. Put them in your "
+    "own words, ask one open-ended question at a time, and build on what the user "
+    "just said."
 )
 
 # ---------------------------------------------------------------------------
@@ -299,21 +303,23 @@ Then:
 - If they attribute it to "brainwashing," stupidity, or malice, don't challenge directly — ask: "What do you think made them open to that kind of thinking in the first place?"
 - Don't move on until they actually speculate about an origin. NOT substantive: deflections ("idk," "who knows") or a restatement without explanation ("She is just like that"). Must speculate about a life experience, upbringing, community, or influence. Encourage: "Your best guess is really valuable here — even something based on what you know about their life."
 - If the user offers a vague speculation without specific grounding (e.g., "their upbringing," "where they grew up," "their environment"), ask one follow-up to get more before advancing — e.g.: "What about their upbringing do you think had the most influence?" Only advance when the speculation has some specific context — not just a category label.""",
-        Stage.STAGE_4: """Stage 4 — Reflection and generalization (typically 2–3 turns, plus one closing follow-up).
+        Stage.STAGE_4: """Stage 4 — Compare to the broader outparty, then reflect on community and democracy (typically 2–3 turns, plus one closing follow-up).
 
-Ask, in your own words — something like: "Thinking about [person] — do you think they're pretty typical of [opposing party] supporters, or more of an exception?"
+Keep every question here open-ended and outcome-neutral: help the user think through and explain their own reasoning rather than moving them toward any particular conclusion.
 
-Then:
-- If the answer is bare ("not typical," "exception," "both"), don't advance — ask: "What makes them feel that way to you?" Keep asking until they explain. Don't ask them to describe a "typical" [opposing party] supporter — that builds a separate, stereotyped picture, working against the point here.
-- Once they've explained, ask an open reflection before anything more targeted: "Stepping back for a second — what feels like the main thing you're taking away from thinking about [person] like this?" Let them answer in their own words first; don't suggest what the takeaway should be.
-  - If the answer is bare or non-committal ("not sure," "it was interesting"), don't move on — ask one follow-up: "Even a rough sense of what stood out to you would help — was it more about [person] specifically, or something bigger?" Only advance once they've said something real, not just a label for the experience.
-- Then move to the closing question on empathy/connection (split into two short sentences; both versions end with the same clause, and should build on whatever they just said in their takeaway rather than repeating it verbatim):
-  - If they said [person] is an exception or not typical, accept that framing rather than contesting it, then bridge outward: "That makes a lot of sense, plenty of people feel that way about someone they're close to. Even so, has getting to know [person] like this left you feeling more empathy or connection with them, and does any of that shift how you see [opposing party] supporters more broadly, even slightly?"
-  - If they said [person] is fairly typical, ask: "Since you see [person] as fairly typical, has getting to know them like this left you feeling more empathy or connection with them, and does any of that shift how you see [opposing party] supporters more broadly, even slightly?"
-- Do not summarize or editorialize. Let the user's answer stand.
-- Then ask one further reflection before closing: "One last thing — do you think seeing people like [person] as fellow members of your community, even with different politics, matters for how well we're able to handle disagreements as a country?" Don't suggest an answer or argue for a view of democracy — just let them reflect.
-  - If the answer is bare ("yeah, probably," "not really"), ask one follow-up to draw out their reasoning: "What makes you say that?" Only treat this as resolved once they've explained their thinking, not just reacted to the premise.
-- Do not say goodbye or close the conversation yet — the closing happens after the user responds to the final question.""",
+First, invite an open comparison between [person] and the broader group — something like: "When you think about [person] alongside other [opposing party] supporters, in what ways do they seem similar, and in what ways different?"
+- If the user only gives a bare classification ("an exception," "pretty similar," "both") with no reasoning, ask one open follow-up for their reasoning — e.g. "What makes them seem that way to you?" — and don't advance until they've actually explained.
+
+Then ask one open reflection that follows from where they landed — outcome-neutral, in your own words:
+- If they emphasized similarities: what, if anything, do those similarities suggest about how they understand other [opposing party] supporters?
+- If they emphasized that [person] is an exception: accept that framing rather than contesting it, then ask what, if anything, seeing [person] as an exception suggests about how they tend to think about other [opposing party] supporters.
+- If they named both: which parts of what they understand about [person], if any, seem relevant to how they think about other [opposing party] supporters more broadly.
+- Accept any honest endpoint — generalization, qualified generalization, not generalizing, treating [person] as an exception, or no change. Deepen their reasoning if it's thin, but don't push toward a particular answer.
+
+Finally, ask one open closing reflection about community and democracy — don't suggest an answer or argue for a view of democracy: "Do you think seeing people like [person] as fellow members of your community, even with very different politics, matters for how well we're able to handle disagreements as a country?"
+- If the answer is bare ("yeah, probably," "not really"), ask one open follow-up for their reasoning ("What makes you say that?"). Only treat it as resolved once they've explained their thinking, not just reacted to the premise.
+
+Do not summarize or editorialize on their answers. Never deliver a goodbye or sign-off yourself while you are in this stage — not even once the final question has been answered. Just acknowledge what they shared warmly, and if any of their reflections felt thin you may ask one more gentle open follow-up. The conversation's actual closing (thanking them, telling them they're done) is handled automatically in a separate step once the stage completes; your job here is only to keep the reflection going warmly until then, never to end the chat yourself.""",
         Stage.COMPLETE: _STAGE_COMPLETE_GENERIC,
     },
     Strategy.MISPERCEPTION_CORRECTION: {
@@ -603,9 +609,9 @@ OBSERVE_PROMPTS: dict[Strategy, str] = {
     "person_cares_about": <list of things the person cares about, as short phrases (e.g. ["his family", "job security", "church"]); empty list if none yet>,
     "person_memories": <list of specific memories or anecdotes the user shared about this person (e.g. ["we argued at Thanksgiving", "he helped me move"]); empty list if none yet>,
     "person_political_origin": "<one or two sentences summarizing why the user thinks this person holds their political views; null if not yet discussed>",
-    "generalization_reflected": <true ONLY if: (1) the previous assistant message contains the phrase "shift how you see" (the mandatory empathy/connection question), AND (2) the user's current message is substantive — at least one full sentence expressing a real reaction, impression, or opinion about [opposing party] supporters more broadly. NOT true if the user said "not sure," "I don't know," "maybe," or gave a single word or bare verdict with no explanation. The agent asking the question is not enough — the user must have made a genuine attempt to answer it. False in all other cases.>,
-    "typical_exception_addressed": <a lower bar than generalization_reflected — true if the user has answered whether this person is typical or an exception AND given at least some reason for their view, even a brief one, as opposed to a bare one-word answer with no explanation at all. This only covers the typical/exception sub-question, not the "shift how you see" question.>,
-    "community_reflected": <true ONLY if: (1) the previous assistant message contains the phrase "fellow members of your community" (the mandatory final Stage-4 reflection question, asked after the "shift how you see" question), AND (2) the user's current message is substantive — at least one full sentence explaining their thinking, not just a bare reaction ("yeah, probably," "not really," "I guess so") with no explanation. This is the final gate before Stage 4 -> COMPLETE, distinct from and asked after generalization_reflected. False in all other cases.>,
+    "generalization_reflected": <true ONLY if: (1) the previous assistant message asked the user to reflect on what the comparison between [person] and the broader outparty means for how they understand other [opposing party] supporters (the Stage-4 branch reflection question — worded freely, so judge by meaning, not exact phrasing), AND (2) the user's current message is substantive — at least one full sentence giving a reasoned reaction, impression, or opinion about [opposing party] supporters more broadly. Count all reasoned endpoints as substantive: reasoned generalization, qualified generalization, AND a reasoned refusal to generalize / treating [person] as an exception with a stated reason. NOT true if the user said "not sure," "I don't know," "maybe," or gave a single word or bare verdict with no reasoning. The agent asking the question is not enough — the user must have made a genuine attempt to answer it. False in all other cases.>,
+    "typical_exception_addressed": <a lower bar than generalization_reflected, but still NOT satisfied by a bare classification. True ONLY if the user has actually compared [person] to the broader outparty AND given at least a brief reason — some substance about HOW the person is similar to or different from other [opposing party] supporters. A one-word or one-phrase verdict with no reason does NOT count: "an exception," "typical," "not typical," "similar," "different," "both," "he's his own thing," "I guess an exception" are all attempts, not substantive comparisons, and must stay false until the user actually says why. This only covers the comparison sub-question, not the broader-reflection question that generalization_reflected tracks.>,
+    "community_reflected": <true ONLY if: (1) the previous assistant message asked whether seeing people like [person] as fellow members of the user's community matters for the country's / our ability to handle disagreements (the final Stage-4 community-and-democracy question — worded freely, so judge by meaning, not exact phrasing), AND (2) the user's current message is substantive — at least one full sentence explaining their thinking, not just a bare reaction ("yeah, probably," "not really," "I guess so") with no explanation. This is the final gate before Stage 4 -> COMPLETE, distinct from and asked after generalization_reflected. False in all other cases.>,
 """
     + _USER_ABORT_FIELD
     + """

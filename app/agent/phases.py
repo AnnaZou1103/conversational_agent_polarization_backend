@@ -92,10 +92,11 @@ def _pn_stage2_complete(s: dict, n: int) -> bool:
 
 def _pn_stage4_complete(s: dict, n: int) -> bool:
     """personal_narrative Stage 4 -> COMPLETE: requires both mandatory
-    follow-ups (empathy/"shift how you see", then the community-membership
-    question), not just the first. Same floor/cap/grace shape as `_gated`,
-    but the "attempted" fallback also counts having cleared the first
-    question alone, since that's real, if partial, engagement in this stage.
+    reflections (the broader-outparty generalization reflection, then the
+    community-and-democracy question), not just the first. Same floor/cap/
+    grace shape as `_gated`, but the "attempted" fallback also counts having
+    cleared the comparison/first reflection alone, since that's real, if
+    partial, engagement in this stage.
     """
     both_answered = bool(s.get("generalization_reflected")) and bool(
         s.get("community_reflected")
