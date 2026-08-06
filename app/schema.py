@@ -64,6 +64,7 @@ class UserState(CaseModel):
         "complete",
     ]
     screened: bool = False
+    screen_reason: list[str] | None = None
 
 
 class AgentStrategy(CaseModel):
