@@ -9,11 +9,12 @@ COMMON_IDENTITY_DATA_CARD
   Replace with the exact survey citation when final data is available.
 """
 
-# Placeholder — replace with actual survey citation and wording when available
+# Placeholder, replace with actual survey citation and wording when available
 COMMON_IDENTITY_DATA_CARD = (
-    "In a recent national survey, most Americans — across party lines — "
-    "said they feel exhausted with political division and don't feel "
-    "represented by the most extreme voices."
+    "In a recent national survey, most Americans, across party lines, "
+    "said they feel exhausted with political division, don't feel "
+    "represented by the most extreme voices, and, whatever their party, "
+    "have little appetite for the conflict boiling over into real hostility."
 )
 
 """
@@ -23,9 +24,9 @@ Fill in actual values from the source document when available.
 Each entry corresponds to one quiz question, in order.
 
 Fields:
-  id              — question key used in session signals ("q1"–"q8")
-  label           — short description of the action (party-neutral, for display)
-  survey_average  — the survey finding for this action, stated as a fact sentence.
+  id             : question key used in session signals ("q1"–"q8")
+  label          : short description of the action (party-neutral, for display)
+  survey_average : the survey finding for this action, stated as a fact sentence.
                     "{party}" is replaced at runtime (via _get_opposing_party)
                     with the opposing-party adjective ("Republican" or
                     "Democratic"), the same label the quiz questions use.
