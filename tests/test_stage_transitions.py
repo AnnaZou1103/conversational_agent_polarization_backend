@@ -176,17 +176,17 @@ def test_control_skips_to_stage_4() -> None:
         # Still talking (no winding_down signal, under the turn cap) -> stays put.
         s = _evaluate(strategy, Stage.STAGE_1, 3, {})
         assert s.stage == Stage.STAGE_1, strategy
-        # winding_down but under the depth floor (n=10 < 11) -> stays put.
-        s = _evaluate(strategy, Stage.STAGE_1, 10, {"winding_down": True})
+        # winding_down but under the depth floor (n=9 < 10) -> stays put.
+        s = _evaluate(strategy, Stage.STAGE_1, 9, {"winding_down": True})
         assert s.stage == Stage.STAGE_1, strategy
-        # winding_down and at/past the depth floor (n=11) -> advances.
-        s = _evaluate(strategy, Stage.STAGE_1, 11, {"winding_down": True})
+        # winding_down and at/past the depth floor (n=10) -> advances.
+        s = _evaluate(strategy, Stage.STAGE_1, 10, {"winding_down": True})
         assert s.stage == Stage.STAGE_4, strategy
-        # Turn-count safety net fires at n=15 even without the signal.
-        s = _evaluate(strategy, Stage.STAGE_1, 15, {})
+        # Turn-count safety net fires at n=14 even without the signal.
+        s = _evaluate(strategy, Stage.STAGE_1, 14, {})
         assert s.stage == Stage.STAGE_4, strategy
         # Below safety net cap without signal -> stays put.
-        s = _evaluate(strategy, Stage.STAGE_1, 14, {})
+        s = _evaluate(strategy, Stage.STAGE_1, 13, {})
         assert s.stage == Stage.STAGE_1, strategy
         # In Stage 4, still has more to add -> stays put.
         s = _evaluate(strategy, Stage.STAGE_4, 1, {"winding_down": False})
