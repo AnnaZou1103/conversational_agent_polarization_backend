@@ -175,21 +175,27 @@ _TRANSITIONS: dict[str, list[tuple[Stage, Stage, Predicate]]] = {
     #
     # In practice most users never volunteer an explicit "I'm done" — they just
     # keep answering follow-ups (the base prompt always asks one), so a session
-    # relying solely on `winding_down` can run indefinitely. The caps (n>=5 /
-    # n>=2) bound that, matching the study's original 3-5 minute target; the
-    # STAGE_1 prompt also now proactively checks in around turn 4 instead of
-    # waiting for the user to bring up closing.
+    # relying solely on `winding_down` can run indefinitely. The caps (n>=15 /
+    # n>=2) bound that; the STAGE_1 prompt also proactively checks in once the
+    # floor is reached instead of waiting for the user to bring up closing.
     "control": [
-        # n>=8 floor: match ~10-turn natural depth of structured conditions.
-        # n>=12 safety net: ensures completion for fully uncooperative participants.
+        # n>=11 floor: match the ~13-turn depth the structured conditions
+        # actually reach. The floor, not the cap, is the binding gate here —
+        # in pilot data 23/26 completed control sessions left STAGE_1 via
+        # `winding_down` at turn 8-9 and only 2 ever hit the cap, which held
+        # the controls to ~10 turns vs ~13 in the treatment conditions.
+        # n>=15 safety net: ensures completion for fully uncooperative
+        # participants, and keeps the same 4-turn margin over the floor the
+        # 8/12 pair had (a cap too close to the floor would cancel most of
+        # the floor's effect).
         (Stage.STAGE_1, Stage.STAGE_4,
-         lambda s, n: (bool(s.get("winding_down")) and n >= 8) or n >= 12),
+         lambda s, n: (bool(s.get("winding_down")) and n >= 11) or n >= 15),
         (Stage.STAGE_4, Stage.COMPLETE,
          lambda s, n: bool(s.get("winding_down")) or n >= 2),
     ],
     "control_politics": [
         (Stage.STAGE_1, Stage.STAGE_4,
-         lambda s, n: (bool(s.get("winding_down")) and n >= 8) or n >= 12),
+         lambda s, n: (bool(s.get("winding_down")) and n >= 11) or n >= 15),
         (Stage.STAGE_4, Stage.COMPLETE,
          lambda s, n: bool(s.get("winding_down")) or n >= 2),
     ],
