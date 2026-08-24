@@ -9,7 +9,9 @@ Collections: `users`, `conversations`
 
 ### `users` collection
 
-One document per participant. Created by the admin generate endpoints.
+One document per participant. Created either on intake (`POST /user/create`,
+which the `/survey` landing page calls on every request) or by the admin
+generate endpoints.
 
 ```json
 {
@@ -17,6 +19,10 @@ One document per participant. Created by the admin generate endpoints.
   "type":       "study",
   "strategy":   "common_identity",
   "state":      "not_started",
+  "source":     "cloudresearch",
+  "participant_id": "60B5007270544B84BD9D615FDF5635D0",
+  "assignment_id":  null,
+  "project_id":     null,
   "party":      null,
   "pre_survey": { "q1": "3", "q2": "5" },
   "post_survey": { "q1": "4", "q2": "5" },
@@ -31,6 +37,10 @@ One document per participant. Created by the admin generate endpoints.
 | `type` | string | `study`, `experiment` | `experiment` = pre-study test user |
 | `strategy` | string | see conditions | Assigned condition, set at creation, never changes |
 | `state` | string | see state machine | Participant's current position in the study flow |
+| `source` | string | `cloudresearch`, `admin`, `manual` | How the record was created — see below |
+| `participant_id` | string \| null | 32-char alphanumeric | CloudResearch participant, from the `participantId` query param |
+| `assignment_id` | string \| null | | CloudResearch `assignmentId` query param |
+| `project_id` | string \| null | | CloudResearch `projectId` query param |
 | `party` | string \| null | `republican`, `democrat` | Set during intake; null until collected |
 | `pre_survey` | object \| null | `{ question_id: answer }` | Raw survey responses, saved by frontend |
 | `post_survey` | object \| null | `{ question_id: answer }` | Raw survey responses, saved by frontend |
@@ -51,6 +61,31 @@ normal post-survey flow.
 
 **Conditions (`strategy`):**
 `common_identity`, `personal_narrative`, `misperception_correction`, `control`, `control_politics`
+
+**Condition assignment and `source`:**
+
+When `POST /user/create` is called without an explicit `strategy`, the condition
+is assigned by balanced round-robin: count the existing `type: "study"` documents
+per condition and take the smallest (ties broken by `Strategy` enum order).
+
+`source` records how the document came into existence, and controls whether it
+participates in that count:
+
+| `source` | Created by | Counted for balancing |
+|---|---|---|
+| `cloudresearch` | `/survey` with a `participantId` query param — a real participant | yes |
+| `admin` | `POST /admin/generate` or `POST /admin/agent_strategy/generate` — pre-generated links meant to be handed out | yes |
+| `manual` | `/survey` with no `participantId` — researcher testing, link-preview crawlers, stray reloads | **no** |
+
+`manual` records are excluded because `/survey` mints a document on every GET,
+so a single stray page load permanently shifts the counter. Two such batches
+(2026-08-07 and 2026-08-14) skewed assignment for real participants for over two
+weeks before the exclusion was added. Documents predating the `source` field are
+counted (the query excludes only `manual`, it does not require the field).
+
+Note that balancing counts *assignments*, not usable data: screened-out and
+abandoned sessions still occupy a slot, so equal assignment counts do not imply
+equal completed-and-valid N per condition.
 
 ---
 
