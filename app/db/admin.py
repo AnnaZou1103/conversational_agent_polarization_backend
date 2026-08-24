@@ -10,6 +10,55 @@ from app.agent.strategies import Strategy
 
 base_url = os.getenv("PLATFORM_URL")
 
+# How a study user record came into existence. Only "manual" is excluded from
+# the balanced round-robin in create_study_user: those are bare /survey opens
+# with no CloudResearch participantId (researcher testing, link-preview
+# crawlers, stray reloads). They never yield usable data, but counting them
+# skews condition assignment for real participants for weeks afterwards — see
+# the 2026-08-07 and 2026-08-14 records. Admin-generated links are meant to be
+# handed to real participants, so they do count.
+SOURCE_CLOUDRESEARCH = "cloudresearch"
+SOURCE_ADMIN = "admin"
+SOURCE_MANUAL = "manual"
+
+# Study flow order, used to pick the furthest-along record when a participant
+# somehow ended up with more than one (all such duplicates predate the
+# participant_id lookup below).
+_STATE_ORDER = (
+    "not_started",
+    "pre_survey",
+    "to_intervention",
+    "intervention",
+    "to_post_survey",
+    "post_survey",
+    "complete",
+)
+
+
+def _existing_study_id(participant_id: str) -> str | None:
+    """The study_id already issued to this CloudResearch participant, if any.
+
+    /survey mints a user on every GET and redirects to /{study_id}, so a
+    participant who re-opens the CloudResearch link or navigates back to
+    /survey used to get a brand new study_id — and a brand new random
+    condition. Twelve participants did exactly that, one of them four times,
+    and one worked through three conditions until a screener let them in.
+    Returning their existing study_id sends them back to /{study_id}, which
+    routes on state and drops them where they left off (including the
+    screened-out page, so a screen-out stays a screen-out).
+    """
+    docs = list(user_docs.find({"type": "study", "participant_id": participant_id}))
+    if not docs:
+        return None
+    return max(
+        docs,
+        key=lambda d: (
+            _STATE_ORDER.index(d["state"]) if d.get("state") in _STATE_ORDER else -1,
+            d.get("updated_at") or d["created_at"],
+        ),
+    )["study_id"]
+
+
 
 def generate_study_id():
     return "".join(random.choices(string.ascii_letters + string.digits, k=6))
@@ -21,10 +70,23 @@ def create_study_user(
     assignment_id: str = None,
     project_id: str = None,
 ) -> str:
-    """Create a single study user. If strategy is given, use it; otherwise assign via balanced round-robin."""
+    """Create a single study user, or return the one this participant already has.
+
+    If strategy is given, use it; otherwise assign via balanced round-robin.
+    """
+    if participant_id:
+        existing = _existing_study_id(participant_id)
+        if existing is not None:
+            return existing
+    source = SOURCE_CLOUDRESEARCH if participant_id else SOURCE_MANUAL
     if strategy is None:
         strategies = [s.value for s in Strategy]
-        counts = {s: user_docs.count_documents({"type": "study", "strategy": s}) for s in strategies}
+        counts = {
+            s: user_docs.count_documents(
+                {"type": "study", "strategy": s, "source": {"$ne": SOURCE_MANUAL}}
+            )
+            for s in strategies
+        }
         strategy = min(counts, key=counts.get)
     study_id = generate_study_id()
     user_docs.insert_one(
@@ -33,6 +95,7 @@ def create_study_user(
             "type": "study",
             "strategy": strategy,
             "state": "not_started",
+            "source": source,
             "participant_id": participant_id,
             "assignment_id": assignment_id,
             "project_id": project_id,
@@ -52,6 +115,7 @@ def generate_users(count: int):
                     "type": "study",
                     "strategy": stragegy.value,
                     "state": "not_started",
+                    "source": SOURCE_ADMIN,
                     "created_at": datetime.now(timezone.utc),
                     "updated_at": datetime.now(timezone.utc),
                 }
@@ -68,6 +132,7 @@ def generate_users_by_agent_strategy(strategy: str, count: int):
                 "type": "study",
                 "strategy": strategy,
                 "state": "not_started",
+                "source": SOURCE_ADMIN,
                 "created_at": datetime.now(timezone.utc),
                 "updated_at": datetime.now(timezone.utc),
             }
