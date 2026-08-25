@@ -64,6 +64,32 @@ def generate_study_id():
     return "".join(random.choices(string.ascii_letters + string.digits, k=6))
 
 
+def _assign_strategy(project_id: str | None) -> str:
+    """Pick the condition with the fewest participants so far, within this batch.
+
+    The count is scoped to `project_id`, so every CloudResearch project balances
+    itself from zero instead of inheriting whatever imbalance the study has
+    accumulated. Records with no project_id (manual opens, admin-generated
+    links) form their own bucket the same way.
+
+    Ties are broken at random rather than by enum order. With a per-project
+    reset every project starts from an all-zero count, so a fixed tie-break
+    would hand the first participant of every batch the same condition and make
+    the opening sequence identical batch to batch.
+    """
+    scope = {
+        "type": "study",
+        "source": {"$ne": SOURCE_MANUAL},
+        "project_id": project_id,
+    }
+    counts = {
+        s.value: user_docs.count_documents({**scope, "strategy": s.value})
+        for s in Strategy
+    }
+    fewest = min(counts.values())
+    return random.choice([s for s, n in counts.items() if n == fewest])
+
+
 def create_study_user(
     strategy: str = None,
     participant_id: str = None,
@@ -80,14 +106,7 @@ def create_study_user(
             return existing
     source = SOURCE_CLOUDRESEARCH if participant_id else SOURCE_MANUAL
     if strategy is None:
-        strategies = [s.value for s in Strategy]
-        counts = {
-            s: user_docs.count_documents(
-                {"type": "study", "strategy": s, "source": {"$ne": SOURCE_MANUAL}}
-            )
-            for s in strategies
-        }
-        strategy = min(counts, key=counts.get)
+        strategy = _assign_strategy(project_id)
     study_id = generate_study_id()
     user_docs.insert_one(
         {

@@ -66,7 +66,18 @@ normal post-survey flow.
 
 When `POST /user/create` is called without an explicit `strategy`, the condition
 is assigned by balanced round-robin: count the existing `type: "study"` documents
-per condition and take the smallest (ties broken by `Strategy` enum order).
+per condition and take the smallest, breaking ties at random.
+
+The count is scoped to the request's `project_id`, so **every CloudResearch
+project balances itself from zero** rather than inheriting the study's running
+totals. Records with no `project_id` (manual opens, admin-generated links) form
+their own bucket the same way. Ties are random because a per-project reset
+starts every batch from an all-zero count, and a fixed tie-break would hand the
+first participant of every batch the same condition.
+
+The trade-off is that a batch whose size is not a multiple of five leaves a
+remainder inside that batch, and no later batch corrects it — per-project
+balance is bought at the cost of cross-project balance.
 
 `source` records how the document came into existence, and controls whether it
 participates in that count:

@@ -6,6 +6,7 @@ shifts condition assignment for real participants.
 Uses a hand-rolled collection stub rather than a live Mongo, following the
 sys.modules-stubbing convention in test_safety_persistence.py.
 """
+import collections
 import sys
 from unittest.mock import MagicMock
 
@@ -71,13 +72,12 @@ def _counts(col):
 def test_manual_records_are_excluded_from_balancing():
     admin, col = _fresh_admin_module()
 
-    # Five bare /survey opens, all landing on the same condition the tie-break
-    # favours. Under the old counting these would push real participants away
-    # from common_identity for the next five assignments.
+    # Five bare /survey opens. Under the old counting these occupied slots and
+    # pushed real participants off the round-robin for the next five turns.
     for _ in range(5):
         admin.create_study_user()
     assert {d["source"] for d in col.docs} == {"manual"}
-    assert _counts(col)[Strategy.COMMON_IDENTITY.value] == 5
+    assert len(col.docs) == 5
 
     # Real participants must still be assigned a clean round-robin.
     for i in range(5):
@@ -217,3 +217,84 @@ def test_manual_opens_are_unaffected_by_the_participant_lookup():
     ids = [admin.create_study_user() for _ in range(3)]
     assert len(set(ids)) == 3
     assert {d["source"] for d in col.docs} == {"manual"}
+
+
+def test_each_project_balances_from_zero():
+    admin, col = _fresh_admin_module()
+
+    # Batch A runs to a clean round-robin.
+    for i in range(5):
+        admin.create_study_user(participant_id=f"A{i:030d}", project_id="proj-A")
+    a = [d["strategy"] for d in col.docs if d["project_id"] == "proj-A"]
+    assert sorted(a) == sorted(ALL), a
+
+    # Batch B starts from zero rather than inheriting A's totals.
+    for i in range(5):
+        admin.create_study_user(participant_id=f"B{i:030d}", project_id="proj-B")
+    b = [d["strategy"] for d in col.docs if d["project_id"] == "proj-B"]
+    assert sorted(b) == sorted(ALL), b
+
+
+def test_a_skewed_project_does_not_bleed_into_the_next_one():
+    admin, col = _fresh_admin_module()
+
+    # An earlier batch that is heavily lopsided — e.g. one condition was forced
+    # with an explicit strategy for a pilot.
+    for i in range(8):
+        admin.create_study_user(
+            strategy=Strategy.CONTROL.value,
+            participant_id=f"A{i:030d}",
+            project_id="proj-A",
+        )
+
+    # The next project must still hand out one of each, not spend its first
+    # eight participants compensating for proj-A.
+    for i in range(5):
+        admin.create_study_user(participant_id=f"B{i:030d}", project_id="proj-B")
+    b = [d["strategy"] for d in col.docs if d["project_id"] == "proj-B"]
+    assert sorted(b) == sorted(ALL), b
+
+
+def test_remainders_stay_inside_their_own_project():
+    admin, col = _fresh_admin_module()
+
+    # 7 participants over 5 conditions: two conditions get 2, the rest 1. The
+    # remainder must not be carried into the next project.
+    for i in range(7):
+        admin.create_study_user(participant_id=f"A{i:030d}", project_id="proj-A")
+    counts_a = collections.Counter(
+        d["strategy"] for d in col.docs if d["project_id"] == "proj-A"
+    )
+    assert sorted(counts_a.values()) == [1, 1, 1, 2, 2], dict(counts_a)
+
+    for i in range(5):
+        admin.create_study_user(participant_id=f"B{i:030d}", project_id="proj-B")
+    counts_b = collections.Counter(
+        d["strategy"] for d in col.docs if d["project_id"] == "proj-B"
+    )
+    assert sorted(counts_b.values()) == [1, 1, 1, 1, 1], dict(counts_b)
+
+
+def test_records_with_no_project_form_their_own_bucket():
+    admin, col = _fresh_admin_module()
+
+    for i in range(5):
+        admin.create_study_user(participant_id=f"P{i:030d}", project_id="proj-A")
+    # A participant arriving without a projectId is balanced against the other
+    # project-less records, not against proj-A.
+    for i in range(5):
+        admin.create_study_user(participant_id=f"N{i:030d}")
+
+    loose = [d["strategy"] for d in col.docs if d["project_id"] is None]
+    assert sorted(loose) == sorted(ALL), loose
+
+
+def test_ties_are_not_always_broken_the_same_way():
+    """Every project resets to an all-zero count, so a fixed tie-break would
+    give the first participant of every batch the same condition."""
+    firsts = set()
+    for run in range(25):
+        admin, col = _fresh_admin_module()
+        admin.create_study_user(participant_id=f"X{run:030d}", project_id=f"p{run}")
+        firsts.add(col.docs[0]["strategy"])
+    assert len(firsts) > 1, firsts

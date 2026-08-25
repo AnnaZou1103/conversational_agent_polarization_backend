@@ -90,9 +90,9 @@ def run() -> int:
         str([d.get("source") for d in manual]),
     )
     failures += not check(
-        "they all pile onto one condition (which is what used to skew assignment)",
-        len({d["strategy"] for d in manual}) == 1,
-        str(sorted({d["strategy"] for d in manual})),
+        "and none of them is tagged cloudresearch",
+        not any(d["source"] == "cloudresearch" for d in manual),
+        str([d["source"] for d in manual]),
     )
     for i in range(5):
         create_study_user(participant_id=f"PID{i:029d}")
@@ -144,6 +144,48 @@ def run() -> int:
     failures += not check(
         "their condition is unchanged",
         user_docs.find_one({"study_id": first})["strategy"] == condition,
+    )
+    cleanup()
+
+    print("\n=== each project balances from zero ===")
+    # `{"project_id": None}` must match documents where the key is absent, the
+    # same way `$ne` does — admin-generated links have no project_id key.
+    user_docs.insert_one({"type": "study", "strategy": CONTROL, "source": "cloudresearch"})
+    no_project = user_docs.count_documents(
+        {"type": "study", "source": {"$ne": "manual"}, "project_id": None}
+    )
+    failures += not check(
+        "project_id: None matches a document with no project_id key",
+        no_project == 1,
+        f"matched {no_project}, expected 1",
+    )
+    cleanup()
+
+    for i in range(5):
+        create_study_user(participant_id=f"A{i:030d}", project_id="proj-A")
+    a = sorted(d["strategy"] for d in user_docs.find({"project_id": "proj-A"}))
+    failures += not check("batch A gets one of each condition", a == sorted(ALL), str(a))
+
+    for i in range(5):
+        create_study_user(participant_id=f"B{i:030d}", project_id="proj-B")
+    b = sorted(d["strategy"] for d in user_docs.find({"project_id": "proj-B"}))
+    failures += not check(
+        "batch B starts from zero instead of inheriting A's totals",
+        b == sorted(ALL),
+        str(b),
+    )
+    cleanup()
+
+    print("\n=== a lopsided project does not bleed into the next one ===")
+    for i in range(8):
+        create_study_user(strategy=CONTROL, participant_id=f"A{i:030d}", project_id="proj-A")
+    for i in range(5):
+        create_study_user(participant_id=f"B{i:030d}", project_id="proj-B")
+    b = sorted(d["strategy"] for d in user_docs.find({"project_id": "proj-B"}))
+    failures += not check(
+        "batch B is unaffected by 8 forced control assignments in batch A",
+        b == sorted(ALL),
+        str(b),
     )
     cleanup()
 
