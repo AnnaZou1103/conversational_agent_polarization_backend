@@ -131,6 +131,7 @@ async def chat_completions(request: ChatCompletionRequest):
                 completion_id,
                 request.model,
                 study_id,
+                request.quiz_answer,
             ),
             media_type="text/event-stream",
             headers={
@@ -143,7 +144,10 @@ async def chat_completions(request: ChatCompletionRequest):
         # Non-streaming: collect full response
         full_response = []
         async for token in pipeline.process_turn(
-            messages=messages, strategy_name=strategy_name, study_id=study_id
+            messages=messages,
+            strategy_name=strategy_name,
+            study_id=study_id,
+            quiz_answer=request.quiz_answer,
         ):
             if token is AgentPipeline.KEEP_ALIVE:
                 continue
@@ -187,6 +191,7 @@ async def _stream_response(
     completion_id: str,
     model_id: str = "common-identity",
     study_id: str | None = None,
+    quiz_answer: int | None = None,
 ):
     """Generate SSE stream in OpenAI chunk format."""
     created = int(time.time())
@@ -210,7 +215,10 @@ async def _stream_response(
 
     # Stream content tokens (pipeline may yield KEEP_ALIVE during blocking work)
     async for token in pipeline.process_turn(
-        messages=messages, strategy_name=strategy_name, study_id=study_id
+        messages=messages,
+        strategy_name=strategy_name,
+        study_id=study_id,
+        quiz_answer=quiz_answer,
     ):
         # Keep-alive: send SSE comment to prevent proxy/client timeout
         if token is AgentPipeline.KEEP_ALIVE:

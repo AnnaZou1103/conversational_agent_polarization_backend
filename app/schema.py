@@ -64,6 +64,7 @@ class UserState(CaseModel):
         "complete",
     ]
     screened: bool = False
+    screen_reason: list[str] | None = None
 
 
 class AgentStrategy(CaseModel):
@@ -130,6 +131,12 @@ class ChatCompletionRequest(CaseModel):
     stream: bool = False
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
+    # Misperception-correction quiz: the Likert value (1-4) the participant
+    # clicked for the question currently being asked. Sent by the frontend so
+    # the score is recorded from the actual UI selection rather than
+    # re-extracted from free text by the OBSERVE LLM. None for any other
+    # message (typed answers, other conditions, reflection turns).
+    quiz_answer: Optional[int] = None
 
 
 class CIObservation(CaseModel):

@@ -9,11 +9,12 @@ COMMON_IDENTITY_DATA_CARD
   Replace with the exact survey citation when final data is available.
 """
 
-# Placeholder — replace with actual survey citation and wording when available
+# Placeholder, replace with actual survey citation and wording when available
 COMMON_IDENTITY_DATA_CARD = (
-    "In a recent national survey, most Americans — across party lines — "
-    "said they feel exhausted with political division and don't feel "
-    "represented by the most extreme voices."
+    "In a recent national survey, most Americans, across party lines, "
+    "said they feel exhausted with political division, don't feel "
+    "represented by the most extreme voices, and, whatever their party, "
+    "have little appetite for the conflict boiling over into real hostility."
 )
 
 """
@@ -23,9 +24,9 @@ Fill in actual values from the source document when available.
 Each entry corresponds to one quiz question, in order.
 
 Fields:
-  id              — question key used in session signals ("q1"–"q8")
-  label           — short description of the action (party-neutral, for display)
-  survey_average  — the survey finding for this action, stated as a fact sentence.
+  id             : question key used in session signals ("q1"–"q8")
+  label          : short description of the action (party-neutral, for display)
+  survey_average : the survey finding for this action, stated as a fact sentence.
                     "{party}" is replaced at runtime (via _get_opposing_party)
                     with the opposing-party adjective ("Republican" or
                     "Democratic"), the same label the quiz questions use.
@@ -79,3 +80,31 @@ QUIZ_QUESTIONS: list[dict] = [
         "survey_average": "Most {party} supporters would never support this action.",
     },
 ]
+
+
+# Numeric survey answer per question on the 1–4 Likert scale, derived from each
+# survey_average sentence so the sentence stays the single source of truth
+# (never→1, probably not→2, probably→3, definitely→4). Used to compute the
+# aggregate survey mean, which the misperception_correction pipeline compares
+# against the participant's own mean estimate to classify their response
+# pattern for the Stage 3 reflection (see app/agent/pipeline.py).
+_LIKERT_FROM_TEXT: tuple[tuple[str, int], ...] = (
+    ("would definitely", 4),
+    ("would probably not", 2),  # must precede "would probably"
+    ("would probably", 3),
+    ("would never", 1),
+)
+
+
+def _survey_value(sentence: str) -> int:
+    lowered = sentence.lower()
+    for phrase, value in _LIKERT_FROM_TEXT:
+        if phrase in lowered:
+            return value
+    raise ValueError(f"Cannot derive survey value from sentence: {sentence!r}")
+
+
+SURVEY_VALUES: dict[str, int] = {
+    q["id"]: _survey_value(q["survey_average"]) for q in QUIZ_QUESTIONS
+}
+SURVEY_AVERAGE: float = sum(SURVEY_VALUES.values()) / len(SURVEY_VALUES)

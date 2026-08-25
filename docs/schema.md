@@ -113,7 +113,7 @@ One document per participant. Created on the first chat turn. Unique index on `s
     "signals": {
       "feeling_expressed": true,
       "user_feeling_text": "frustrated and exhausted",
-      "media_mentioned": true,
+      "user_media_text": "mostly cable news and Twitter",
       "media_distortion_acknowledged": false,
       "exhausted_majority_introduced": false,
       "common_identity_described": false
@@ -173,7 +173,10 @@ Both this and the consecutive-reminder safety termination (`action: "terminate"`
 
 ### Signals by condition
 
-Signals are extracted by the OBSERVE step and accumulated across turns. Stored inside `payload.signals`.
+Signals are extracted by the OBSERVE step and accumulated across turns, stored
+inside `payload.signals`. A few are instead computed deterministically in the
+pipeline (noted below). `user_abort` (bool — user asked to end the conversation)
+is extracted for every condition and is omitted from the per-condition tables.
 
 **`common_identity`**
 
@@ -181,40 +184,65 @@ Signals are extracted by the OBSERVE step and accumulated across turns. Stored i
 |---|---|---|
 | `feeling_expressed` | bool | User has expressed a genuine emotional feeling about the opposing party |
 | `user_feeling_text` | string | Short phrase capturing the user's feeling (max 12 words) |
-| `media_mentioned` | bool | User mentioned news/social media as a source |
-| `user_media_text` | string | Short phrase capturing what the user said about media |
-| `media_distortion_acknowledged` | bool | User gestured toward media not being representative |
+| `user_media_text` | string | Short phrase capturing what the user said about media/their sources |
+| `media_distortion_acknowledged` | bool | User substantively described HOW media distorts their picture of the opposing party |
+| `media_distortion_attempted` | bool | Lower bar: user engaged the media topic at all, even a bare verdict |
 | `exhausted_majority_introduced` | bool | Agent shared the survey data card OR user described the exhausted majority independently |
-| `common_identity_described` | bool | User described a cross-partisan group of ordinary people exhausted with division |
+| `common_identity_described` | bool | Mandatory Stage-3 question asked AND user substantively described the shared cross-partisan feeling/want |
+| `common_identity_attempted` | bool | Lower bar: mandatory Stage-3 question asked AND user gave a brief on-topic answer |
+| `identity_label_pushback` | bool | User explicitly rejected the "common ground"/"shared identity" label (sticky) |
+| `additional_common_ground_surfaced` | bool | In Stage-4 extension, user named another form of connection beyond shared exhaustion |
+| `additional_common_ground_text` | string | Short phrase capturing that additional connection (max 12 words) |
+| `common_ground_extension_exposed` | bool | The "fellow Americans"/economic-concerns framing was said aloud in Stage 4 (sticky) |
+| `closing_reflection_answered` | bool | User gave a substantive reply to the Stage-4 closing question (gates Stage 4 → COMPLETE) |
 
 **`personal_narrative`**
 
 | Signal | Type | Description |
 |---|---|---|
 | `person_label` | string | Label the user chose for the person (`"my uncle"`, `"Sarah"`) |
-| `person_is_real` | bool | Whether the person is real (vs. imagined) |
-| `person_details_count` | int | Count of distinct personal details shared |
-| `origins_explored` | bool | User has discussed or speculated about why the person holds their views |
+| `person_is_real` | bool | Whether the person is a real, specific individual (vs. imagined/typical) |
+| `why_liked_respected` | bool | User gave a real, grounded reason for liking/respecting the person (not a bare trait word) |
+| `person_details_count` | int | Count of distinct substantive personal details shared |
+| `origins_explored` | bool | User gave a specific, grounded speculation about why the person holds their views |
+| `origins_attempted` | bool | Lower bar: user made any attempt to speculate about origins, even a bare category |
 | `person_traits` | string[] | Personality traits mentioned (`["stubborn", "caring"]`) |
 | `person_cares_about` | string[] | Things the person cares about (`["family", "job security"]`) |
 | `person_memories` | string[] | Specific memories or anecdotes |
 | `person_political_origin` | string | Why the user thinks this person holds their political views |
+| `typical_exception_addressed` | bool | User compared the person to the broader outparty with at least a brief reason |
+| `generalization_reflected` | bool | User substantively reflected on what the comparison means for the broader outparty |
+| `community_reflected` | bool | User substantively answered the Stage-4 community-and-democracy question (final gate) |
 
 **`misperception_correction`**
 
 | Signal | Type | Description |
 |---|---|---|
-| `intro_completed` | bool | User agreed to start the quiz |
 | `questions_answered` | int | Number of questions where both user answered AND agent revealed the finding (0–8) |
 | `question_answers` | object | `{ "q1": 2, "q2": 3, ... }` — Likert answer (1–4) per question |
-| `reflection_shared` | bool | User shared an overall reaction after all 8 questions |
+| `mid_quiz_reflection_done` | bool | The mandatory mid-quiz check-in (after Q4) has occurred |
+| `reflection_shared` | bool | User shared a substantive overall reaction after all 8 questions |
+| `estimate_avg` | float | *(pipeline-computed once all 8 answered)* mean of the user's Likert estimates |
+| `survey_avg` | float | *(pipeline-computed)* mean of the survey answers (fixed, 1.25 on the 1–4 scale) |
+| `response_pattern` | string | *(pipeline-computed)* `overestimated` / `close` / `underestimated`, from `estimate_avg` vs `survey_avg`; drives the Stage-3 factual clause |
 
-**`control` / `control_politics`**
+**`control`**
 
 | Signal | Type | Description |
 |---|---|---|
-| `topics_shared` | string[] | Topics the user has mentioned (accumulates across turns) |
-| `current_mood` | string | Overall mood or sentiment from the most recent turns |
+| `topics_shared` | string[] | Things the user has mentioned being on their mind (accumulates across turns) |
+| `current_mood` | string | Overall mood/feeling conveyed most recently |
+| `main_takeaway` | string | The underlying situation/cause behind what the user is going through |
+| `winding_down` | bool | Current message is a short closing acknowledgment after real prior content |
+
+**`control_politics`**
+
+| Signal | Type | Description |
+|---|---|---|
+| `topics_shared` | string[] | Political topics/concerns the user has raised (accumulates across turns) |
+| `current_mood` | string | Overall tone/sentiment conveyed most recently |
+| `main_concern` | string | The specific political issue or structural cause the user cares about most |
+| `winding_down` | bool | Current message is a short closing acknowledgment after real prior content |
 
 ---
 
@@ -229,7 +257,8 @@ Defined in [app/schema.py](../app/schema.py). All models use camelCase aliases f
   "studyId": "abc123",
   "model": "common-identity",
   "message": { "role": "user", "content": "Hello" },
-  "stream": false
+  "stream": false,
+  "quizAnswer": 3
 }
 ```
 
@@ -239,6 +268,9 @@ Defined in [app/schema.py](../app/schema.py). All models use camelCase aliases f
 | `model` | string | `common-identity`, `personal-narrative`, `misperception-correction`, `control`, `control-politics` |
 | `message` | object | `{ role, content }` — content can be a string or OpenAI multimodal array |
 | `stream` | bool | Default `false` |
+| `temperature` | float \| null | Optional generation temperature |
+| `maxTokens` | int \| null | Optional generation token cap |
+| `quizAnswer` | int \| null | Misperception-correction only: the Likert value (1–4) the participant clicked for the current quiz question, so the score is recorded from the UI selection instead of re-extracted from text. Omitted for other conditions/typed answers. |
 
 ### `UserState`
 

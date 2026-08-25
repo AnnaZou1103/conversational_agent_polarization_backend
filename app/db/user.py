@@ -41,10 +41,13 @@ def get_user_party(study_id: str) -> UserParty | None:
 
 
 def advance_user_state(study_id: str, next_state: UserState):
+    update = {"state": next_state.state, "screened": next_state.screened}
+    if next_state.screen_reason is not None:
+        update["screen_reason"] = next_state.screen_reason
     user_docs.update_one(
         {"study_id": study_id},
         {
-            "$set": {"state": next_state.state, "screened": next_state.screened},
+            "$set": update,
             "$currentDate": {"updated_at": True},
         },
     )
