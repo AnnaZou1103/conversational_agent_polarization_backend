@@ -4,6 +4,17 @@ import anthropic
 
 from app.llm.base import LLMProvider, Message
 
+# Model families that still accept `temperature`. Anthropic retires sampling
+# parameters model by model — sonnet-5 and the rest of the 4.6+ generation
+# reject them with a 400 — so this is an allowlist, not a denylist: an unknown
+# or newly configured model gets default sampling rather than a hard failure.
+_SAMPLING_MODEL_PREFIXES = (
+    "claude-haiku-4-5",
+    "claude-sonnet-4-5",
+    "claude-opus-4-5",
+    "claude-3",
+)
+
 
 class AnthropicProvider(LLMProvider):
     """Anthropic Claude LLM provider."""
@@ -11,6 +22,31 @@ class AnthropicProvider(LLMProvider):
     def __init__(self, api_key: str, model: str):
         self.model = model
         self.client = anthropic.AsyncAnthropic(api_key=api_key, max_retries=5)
+        self._send_temperature = model.startswith(_SAMPLING_MODEL_PREFIXES)
+
+    def _sampling_kwargs(self, temperature: float) -> dict:
+        """Request kwargs carrying `temperature`, or empty if unsupported.
+
+        anthropic SDK 1.x dropped `temperature` from the `messages.create` /
+        `messages.stream` signatures (passing it raises TypeError), so on the
+        models that do still honor it we have to smuggle it through the
+        `extra_body` escape hatch, which merges straight into the request JSON.
+        """
+        if not self._send_temperature:
+            return {}
+        return {"extra_body": {"temperature": temperature}}
+
+    def _disable_temperature(self, e: anthropic.BadRequestError) -> bool:
+        """Latch temperature off if the API says this model has retired it.
+
+        Safety net for the allowlist going stale: Anthropic retires sampling
+        params on existing models over time, and without this the OBSERVE step
+        would start failing every turn (and silently degrading) instead of once.
+        """
+        if not (self._send_temperature and "temperature" in str(e) and "deprecated" in str(e)):
+            return False
+        self._send_temperature = False
+        return True
 
     def _build_messages(self, messages: list[Message]) -> list[dict]:
         return [{"role": msg.role, "content": msg.content} for msg in messages]
@@ -33,10 +69,6 @@ class AnthropicProvider(LLMProvider):
             }
         ]
 
-    @staticmethod
-    def _is_temperature_deprecated_error(e: anthropic.BadRequestError) -> bool:
-        return "temperature" in str(e) and "deprecated" in str(e)
-
     async def complete(
         self,
         messages: list[Message],
@@ -47,8 +79,8 @@ class AnthropicProvider(LLMProvider):
         kwargs = {
             "model": self.model,
             "messages": self._build_messages(messages),
-            "temperature": temperature,
             "max_tokens": max_tokens,
+            **self._sampling_kwargs(temperature),
         }
         if system:
             kwargs["system"] = self._system_param(system)
@@ -56,12 +88,9 @@ class AnthropicProvider(LLMProvider):
         try:
             response = await self.client.messages.create(**kwargs)
         except anthropic.BadRequestError as e:
-            # Some newer models (e.g. claude-sonnet-5) reject any non-default
-            # temperature outright. Retry without it rather than hardcoding a
-            # model allowlist.
-            if not self._is_temperature_deprecated_error(e):
+            if not self._disable_temperature(e):
                 raise
-            kwargs.pop("temperature")
+            kwargs.pop("extra_body")
             response = await self.client.messages.create(**kwargs)
 
         # The model can spontaneously prepend a ThinkingBlock even without
@@ -78,8 +107,8 @@ class AnthropicProvider(LLMProvider):
         kwargs = {
             "model": self.model,
             "messages": self._build_messages(messages),
-            "temperature": temperature,
             "max_tokens": max_tokens,
+            **self._sampling_kwargs(temperature),
         }
         if system:
             kwargs["system"] = self._system_param(system)
@@ -89,9 +118,9 @@ class AnthropicProvider(LLMProvider):
                 async for text in stream.text_stream:
                     yield text
         except anthropic.BadRequestError as e:
-            if not self._is_temperature_deprecated_error(e):
+            if not self._disable_temperature(e):
                 raise
-            kwargs.pop("temperature")
+            kwargs.pop("extra_body")
             async with self.client.messages.stream(**kwargs) as stream:
                 async for text in stream.text_stream:
                     yield text
