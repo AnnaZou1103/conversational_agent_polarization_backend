@@ -143,6 +143,19 @@ def _minutes_since_session_start(messages: list[dict]) -> float | None:
     return elapsed.total_seconds() / 60
 
 
+def _history_messages(messages: list[dict]) -> list[Message]:
+    """Coerce the frontend-supplied history into LLM/log Message objects."""
+    return [
+        Message(
+            role=msg["role"],
+            content=msg["content"],
+            timestamp=msg.get("timestamp"),
+        )
+        for msg in messages
+        if msg.get("role") in ("user", "assistant")
+    ]
+
+
 class AgentPipeline:
     """Core agent pipeline implementing plan-execute-observe loop."""
 
@@ -419,6 +432,11 @@ class AgentPipeline:
         # earlier stage and still generates its closing message below. Here we
         # just acknowledge briefly so post-completion chatter doesn't keep
         # spawning new agent turns.
+        # Deliberately NOT logged as a turn: the research payload is already
+        # final at COMPLETE, and logging each ping would overwrite `payload`
+        # (inflating `turn`) and push a redundant signal_history snapshot per
+        # message — unbounded if the participant keeps typing instead of moving
+        # to the survey. See test_post_completion_message_short_circuits.
         if state.stage == Stage.COMPLETE:
             yield COMPLETION_REENTRY_MESSAGE
             return
@@ -506,6 +524,20 @@ class AgentPipeline:
                         verdict.reason,
                         state.consecutive_reminders,
                     )
+                # Log the rejected turn so the reminder exchange survives even
+                # when the participant leaves right after being reminded (the
+                # frontend would otherwise only replay it on a NEXT turn that
+                # never comes). Logged after the stage_turn_count rollback
+                # above, so the persisted counter still doesn't burn a slot;
+                # signals are unchanged because OBSERVE never ran.
+                log_turn(
+                    settings.conversations_dir,
+                    state,
+                    "",
+                    _history_messages(messages),
+                    verdict.reminder_text,
+                    turn_type="safety_reminder",
+                )
                 yield verdict.reminder_text
                 return
 
@@ -606,15 +638,7 @@ class AgentPipeline:
             )
 
         # --- EXECUTE ---
-        llm_messages = [
-            Message(
-                role=msg["role"],
-                content=msg["content"],
-                timestamp=msg.get("timestamp"),
-            )
-            for msg in messages
-            if msg["role"] in ("user", "assistant")
-        ]
+        llm_messages = _history_messages(messages)
 
         # Anthropic requires at least one message; on agent-initiated open the
         # history is empty so we inject a silent trigger.

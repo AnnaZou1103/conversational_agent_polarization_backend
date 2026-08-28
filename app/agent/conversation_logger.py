@@ -67,8 +67,16 @@ def log_turn(
     system_prompt: str,
     messages: list[Message],
     response: str,
+    turn_type: str = "agent",
 ) -> None:
-    """Append a single conversation turn to the session's JSONL log file."""
+    """Append a single conversation turn to the session's JSONL log file.
+
+    `turn_type` distinguishes a normal generated turn ("agent") from a rejected
+    turn that never reached the pipeline ("safety_reminder"): the latter is
+    logged so the reminder exchange survives even as the session's last
+    exchange, but it carries no system prompt and unchanged signals, so
+    analysis needs to be able to tell the two apart.
+    """
     try:
         # path = Path(conversations_dir)
         # path.mkdir(parents=True, exist_ok=True)
@@ -76,6 +84,7 @@ def log_turn(
         now_iso = datetime.now(timezone.utc).isoformat()
         entry = {
             "turn": state.turn_count,
+            "turn_type": turn_type,
             "stage": state.stage.value,
             "stage_turn_count": state.stage_turn_count,
             "strategy": state.strategy,
